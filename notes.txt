@@ -1,0 +1,20 @@
+
+to do 
+
+- read database and all FK's
+
+- create API folders for each entity
+
+- create an openAPI json file 
+
+- authentication scheme - who can do what?
+
+
+
+to run: 
+
+npm run dev 
+
+in a browser, go to 
+
+https://localhost:9000/api/generator/build

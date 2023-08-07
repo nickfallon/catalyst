@@ -31,7 +31,11 @@ else {
 
 let test = require('./api/test');
 
-app.get('/api/v1/test', test.test);
+// app.get('/api/v1/test', test.test);
+// app.get('/', test.test);
+
+let generator = require('./app/generator');
+app.get('/api/generator/build', generator.build);
 
 module.exports = {
     server: server,
