@@ -150,7 +150,12 @@ module.exports = {
             summary: description,
             responses: {
                 200: {
-                    description: "successful operation"
+                    description: "successful operation",
+                    "content": {
+                        "application/json": {
+                          "schema": {}
+                        }
+                      }
                 },
                 400: {
                     description: "Bad Request"

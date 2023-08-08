@@ -13,7 +13,7 @@ const app = express();
 
 app.use(compression());
 app.use(bodyParser.json());
-app.use(bodyParser.text()); 
+app.use(bodyParser.text());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 
@@ -34,14 +34,35 @@ else {
     server = app.listen(port, () => { });
 }
 
+const openapi_json_path = "./openapi.3.0.0.json"
+const openAPIDef = require(openapi_json_path);
+
+//api generator
 let generator = require('./app/generator');
 app.get('/api/generator/build', generator.build);
 
+
+//openapi validation
+const OpenApiValidator = require('express-openapi-validator');
+app.use(
+    OpenApiValidator.middleware({
+        apiSpec: openapi_json_path,
+        validateRequests: true,
+        validateResponses: true
+    }),
+);
+app.use((err, req, res, next) => {
+    // format error
+    res.status(err.status || 500).json({
+        message: `openapi-validator: ${err.message}`,
+        errors: err.errors,
+    });
+});
+
+
 //openapi
 let routes = require("./routes");
-routes.create_api_routes(app);
-
-
+routes.create_api_routes(app, openAPIDef);
 
 console.log('to generate API: https://localhost:9000/api/generator/build');
 
@@ -50,5 +71,5 @@ module.exports = {
     app: app
 }
 
-        
+
 

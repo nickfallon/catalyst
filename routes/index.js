@@ -1,9 +1,7 @@
 
-
-
 module.exports = {
 
-    create_api_routes: (app) => {
+    create_api_routes: (app, openAPIDef) => {
 
         const fs = require("fs");
 
@@ -22,7 +20,6 @@ module.exports = {
 
         //get all controllers in the api folder
 
-        const openAPIDef = require("../openapi.3.0.0.json");
         const apiPath = openAPIDef.servers[0].url;
 
         Object.keys(openAPIDef.paths).forEach(path => {
@@ -32,17 +29,19 @@ module.exports = {
 
             // for each method (get/post/put/delete)
             Object.keys(pathInfo).forEach(restMethod => {
-                // get the REST method, controller and function names from openAPI def
+                // get the REST method, controller, function name and auth_type from openAPI def
                 const methodInfo = pathInfo[restMethod];
                 const operation = methodInfo.operationId.split("/");
                 const routerController = operation[0];
                 const routerMethod = operation[1];
-                //can be empty, auth_user or auth_admin
                 const auth_type = operation[2];
 
                 // get the path and convert {parm} to :parm so express can use it as a route
                 const modifiedPath = module.exports.convertBracketsToColon(path);
                 const expressPath = `${apiPath}${modifiedPath}`;
+
+                // output a list of routes to the console
+                console.log(`created route ${expressPath} --> ${routerController}.${routerMethod}`);
 
                 // create an express route
                 app[restMethod](
