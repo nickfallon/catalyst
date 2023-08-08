@@ -1,7 +1,7 @@
 
 module.exports = {
 
-    create_api_routes: (app, openAPIDef) => {
+    create_api_routes: (app, openAPIDef, apiPath) => {
 
         const fs = require("fs");
 
@@ -19,8 +19,6 @@ module.exports = {
         }
 
         //get all controllers in the api folder
-
-        const apiPath = openAPIDef.servers[0].url;
 
         Object.keys(openAPIDef.paths).forEach(path => {
 

@@ -153,9 +153,9 @@ module.exports = {
                     description: "successful operation",
                     "content": {
                         "application/json": {
-                          "schema": {}
+                            "schema": {}
                         }
-                      }
+                    }
                 },
                 400: {
                     description: "Bad Request"
@@ -164,8 +164,11 @@ module.exports = {
             security: [
                 {
                     bearerAuth: []
-                }
+                },
             ],
+            tags: [
+                `${table_name}`
+            ]
         }
 
     },
@@ -176,7 +179,7 @@ module.exports = {
             openapi: "3.0.0",
             info: {
                 description: "OpenAPI 3.0 description",
-                title: "OpenAPI 3.0 title",
+                title: "OpenAPI 3.0 REST API",
                 version: "1.0.0"
             },
             paths: {

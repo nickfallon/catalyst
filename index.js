@@ -10,13 +10,10 @@ const express = require('express');
 const compression = require('compression');
 const bodyParser = require("body-parser");
 const app = express();
-
 app.use(compression());
 app.use(bodyParser.json());
 app.use(bodyParser.text());
 app.use(bodyParser.urlencoded({ extended: true }));
-
-
 
 // start server
 let server;
@@ -34,13 +31,14 @@ else {
     server = app.listen(port, () => { });
 }
 
+//openapi
 const openapi_json_path = "./openapi.3.0.0.json"
 const openAPIDef = require(openapi_json_path);
+const apiPath = openAPIDef.servers[0].url;
 
-//api generator
+//api code generator
 let generator = require('./app/generator');
 app.get('/api/generator/build', generator.build);
-
 
 //openapi validation
 const OpenApiValidator = require('express-openapi-validator');
@@ -48,21 +46,29 @@ app.use(
     OpenApiValidator.middleware({
         apiSpec: openapi_json_path,
         validateRequests: true,
-        validateResponses: true
+        validateResponses: true,
+        ignorePaths: (path) => path.includes('/api-docs/')
     }),
 );
 app.use((err, req, res, next) => {
-    // format error
     res.status(err.status || 500).json({
         message: `openapi-validator: ${err.message}`,
         errors: err.errors,
     });
 });
 
+//openapi interactive swagger docs
+const swaggerUi = require("swagger-ui-express");
+const swaggerConfig = require("./routes/swaggerUI/config");
+app.use(
+    `${apiPath}/api-docs`,
+    swaggerUi.serve,
+    swaggerUi.setup(openAPIDef, swaggerConfig)
+);
 
-//openapi
+//openapi routes
 let routes = require("./routes");
-routes.create_api_routes(app, openAPIDef);
+routes.create_api_routes(app, openAPIDef, apiPath);
 
 console.log('to generate API: https://localhost:9000/api/generator/build');
 
