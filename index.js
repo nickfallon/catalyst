@@ -37,6 +37,8 @@ let test = require('./api/test');
 let generator = require('./app/generator');
 app.get('/api/generator/build', generator.build);
 
+console.log('to generate API: https://localhost:9000/api/generator/build');
+
 module.exports = {
     server: server,
     app: app
