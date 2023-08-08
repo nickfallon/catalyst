@@ -165,66 +165,6 @@ module.exports = {
 
     },
 
-    generate_script_get_by_id: (
-        table_name,
-        wrapped_table_name
-    ) => {
-
-        let description = `Get ${table_name} by id`;
-        let api_method_path = `/${table_name}/{id}`;
-        let rest_method = 'get';
-        let parameters = [
-            {
-                "description": `${table_name} id`,
-                "in": "path",
-                "name": "id",
-                "required": true,
-                "schema": {
-                    "type": "integer"
-                }
-            }
-        ];
-
-        let api_method = `get_by_id`;
-
-        let script = `
-            ${api_method}: async (req, res) => {
-
-                try {
-                    let id = parseInt(req.params.id);
-                    let result = await module.exports.get_by_id_p(id);
-                    res.json(result);
-                }
-                catch (e){
-                    res.json(e);
-                }
-
-            },
-
-            ${api_method}_p: (id) => {
-
-                let sql = \`
-                    select * from ${wrapped_table_name}
-                    where id = $1;
-                \`;
-
-                let parameters = [id];
-                return db.query_promise(sql, parameters);
-
-            }
-        `;
-
-        return {
-            description,
-            api_method_path,
-            rest_method,
-            api_method,
-            parameters,
-            script
-        }
-
-    },
-
     create_stub_openapi_object: () => {
 
         let stub_openapi_object = {
@@ -317,6 +257,66 @@ module.exports = {
 
         let parameters = [table_name];
         return db.query_promise(sql, parameters);
+
+    },
+
+    generate_script_get_by_id: (
+        table_name,
+        wrapped_table_name
+    ) => {
+
+        let description = `Get ${table_name} by id`;
+        let api_method_path = `/${table_name}/{id}`;
+        let rest_method = 'get';
+        let parameters = [
+            {
+                "description": `${table_name} id`,
+                "in": "path",
+                "name": "id",
+                "required": true,
+                "schema": {
+                    "type": "integer"
+                }
+            }
+        ];
+
+        let api_method = `get_by_id`;
+
+        let script = `
+            ${api_method}: async (req, res) => {
+
+                try {
+                    let id = parseInt(req.params.id);
+                    let result = await module.exports.get_by_id_p(id);
+                    res.json(result);
+                }
+                catch (e){
+                    res.json(e);
+                }
+
+            },
+
+            ${api_method}_p: (id) => {
+
+                let sql = \`
+                    select * from ${wrapped_table_name}
+                    where id = $1;
+                \`;
+
+                let parameters = [id];
+                return db.query_promise(sql, parameters);
+
+            }
+        `;
+
+        return {
+            description,
+            api_method_path,
+            rest_method,
+            api_method,
+            parameters,
+            script
+        }
 
     }
 
