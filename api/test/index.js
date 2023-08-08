@@ -3,7 +3,7 @@ const db = require('../../db');
 
 module.exports = {
 
-    test: (req, res) => {
+    ping: (req, res) => {
 
         res.json({ msg: 'ok' });
 

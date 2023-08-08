@@ -3,15 +3,20 @@
 
 require('dotenv').config();
 
+const port = process.env.PORT || "9000";
+
 //express
 const express = require('express');
 const compression = require('compression');
-const port = process.env.PORT || "9000";
+const bodyParser = require("body-parser");
 const app = express();
 
-require("./routes/middleware")(app);
-
 app.use(compression());
+app.use(bodyParser.json());
+app.use(bodyParser.text()); 
+app.use(bodyParser.urlencoded({ extended: true }));
+
+
 
 // start server
 let server;
@@ -29,13 +34,14 @@ else {
     server = app.listen(port, () => { });
 }
 
-let test = require('./api/test');
-
-// app.get('/api/v1/test', test.test);
-// app.get('/', test.test);
-
 let generator = require('./app/generator');
 app.get('/api/generator/build', generator.build);
+
+//openapi
+let routes = require("./routes");
+routes.create_api_routes(app);
+
+
 
 console.log('to generate API: https://localhost:9000/api/generator/build');
 
@@ -43,4 +49,6 @@ module.exports = {
     server: server,
     app: app
 }
+
+        
 

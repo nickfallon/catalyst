@@ -194,8 +194,8 @@ module.exports = {
                             "Test"
                         ],
                         description: "Ping test, returns 200 OK",
-                        operationId: "health/ping",
-                        summary: "Return a HTTP 200 OK to check the application is available."
+                        operationId: "test/ping",
+                        summary: "Ping test, returns 200 OK."
                     }
                 }
             },
