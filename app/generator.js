@@ -92,9 +92,27 @@ module.exports = {
 
         scripts.push(module_start);
 
-        let { description, api_method_path, rest_method, api_method, parameters, script } = module.exports.generate_script_get_by_id(table_name, wrapped_table_name);
+        let {
+            description,
+            api_method_path,
+            rest_method,
+            api_method,
+            parameters,
+            script
+        } = module.exports.generate_script_get_by_id(
+            table_name,
+            wrapped_table_name
+        );
 
-        module.exports.attach_path_to_openapi_object(openapi_object, table_name, description, api_method_path, rest_method, api_method, parameters, script);
+        module.exports.attach_path_to_openapi_object(
+            openapi_object,
+            table_name,
+            description,
+            api_method_path,
+            rest_method,
+            api_method,
+            parameters,
+            script);
 
         scripts.push(script);
 
@@ -103,11 +121,24 @@ module.exports = {
         //write the code file to the api entity sub-folder 
 
         let api_entity_codefile_path = `${api_entity_path}/index.js`;
-        fs.writeFileSync(api_entity_codefile_path, scripts.join(''));
+
+        fs.writeFileSync(
+            api_entity_codefile_path,
+            scripts.join('')
+        );
 
     },
 
-    attach_path_to_openapi_object: (openapi_object, table_name, description, api_method_path, rest_method, api_method, parameters, script) => {
+    attach_path_to_openapi_object: (
+        openapi_object,
+        table_name,
+        description,
+        api_method_path,
+        rest_method,
+        api_method,
+        parameters,
+        script
+    ) => {
 
         openapi_object.paths[api_method_path] = {
         }
@@ -134,7 +165,10 @@ module.exports = {
 
     },
 
-    generate_script_get_by_id: (table_name, wrapped_table_name) => {
+    generate_script_get_by_id: (
+        table_name,
+        wrapped_table_name
+    ) => {
 
         let description = `Get ${table_name} by id`;
         let api_method_path = `/${table_name}/{id}`;
@@ -180,7 +214,14 @@ module.exports = {
             }
         `;
 
-        return { description, api_method_path, rest_method, api_method, parameters, script }
+        return {
+            description,
+            api_method_path,
+            rest_method,
+            api_method,
+            parameters,
+            script
+        }
 
     },
 
