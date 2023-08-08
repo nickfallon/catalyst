@@ -132,11 +132,9 @@ module.exports = {
             ],
         }
 
-
     },
 
     generate_script_get_by_id: (table_name, wrapped_table_name) => {
-
 
         let description = `Get ${table_name} by id`;
         let api_method_path = `/${table_name}/{id}`;

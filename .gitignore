@@ -1,3 +1,5 @@
+api
+openapi.3.0.0.json
 certs
 node_modules
 .env
