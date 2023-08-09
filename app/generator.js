@@ -7,11 +7,16 @@ module.exports = {
 
     build: async (req, res) => {
 
+        // generates a REST API based on the database specified in the .env file. 
+        // - the generated code is written to /api
+        // - a json file called openapi.3.0.0.json is written to the app root.
+        // after restarting the app, the API is available for use at /api/v1/api-docs.
+
         //create stub openAPI object
 
         let openapi_object = module.exports.create_stub_openapi_object();
 
-        //get public tables
+        //get public tables from postgres
 
         let tables = await module.exports.get_public_tables();
 
@@ -23,7 +28,7 @@ module.exports = {
         }
         table_names.sort();
 
-        //create entities
+        //create entity code for each table
 
         for (table of table_names) {
             await module.exports.create_entity(table, openapi_object);
