@@ -95,7 +95,7 @@ module.exports = {
 
         // join column names with commas for SQL building.
 
-        let column_names = columns
+        let column_names_array = columns
             // if the entity has a 'uuid' field, do not include the 'id' field.
             // the assumption is that if 'uuid' exists, we don't want to also leak 'id' in queries
             .filter((column) => {
@@ -103,8 +103,9 @@ module.exports = {
             })
             .map((column) => {
                 return column.column_name
-            })
-            .join(', ');
+            });
+
+        let column_names_csv = column_names_array.join(', ');
 
         //create an entity sub-folder in the API folder to hold our api code for this entity
 
@@ -144,7 +145,7 @@ module.exports = {
 
         // create get_all
 
-        script_metadata = module.exports.generate_script_get_all(table_name, column_names, wrapped_table_name);
+        script_metadata = module.exports.generate_script_get_all(table_name, columns, column_names_csv, wrapped_table_name);
         module.exports.attach_path_to_openapi_object(openapi_object, table_name, script_metadata);
         scripts.push(script_metadata.script);
 
@@ -159,7 +160,7 @@ module.exports = {
 
             // create get_by_uuid
 
-            script_metadata = module.exports.generate_script_get_by_uuid(table_name, column_names, wrapped_table_name);
+            script_metadata = module.exports.generate_script_get_by_uuid(table_name, columns, column_names_csv, wrapped_table_name);
             module.exports.attach_path_to_openapi_object(openapi_object, table_name, script_metadata);
             scripts.push(script_metadata.script);
         }
@@ -169,7 +170,7 @@ module.exports = {
 
             // create get_by_id
 
-            script_metadata = module.exports.generate_script_get_by_id(table_name, column_names, wrapped_table_name);
+            script_metadata = module.exports.generate_script_get_by_id(table_name, columns, column_names_csv, wrapped_table_name);
             module.exports.attach_path_to_openapi_object(openapi_object, table_name, script_metadata);
             scripts.push(script_metadata.script);
         }
@@ -376,7 +377,8 @@ module.exports = {
 
     generate_script_get_all: (
         table_name,
-        column_names,
+        columns, 
+        column_names_csv,
         wrapped_table_name
     ) => {
 
@@ -387,7 +389,7 @@ module.exports = {
         let rest_method = 'get';
         let parameters = [
             {
-                "description": `pagesize`,
+                "description": `pagesize (optional. default is 10, max is 100)`,
                 "in": "query",
                 "name": "pagesize",
                 "required": false,
@@ -396,7 +398,7 @@ module.exports = {
                 }
             },
             {
-                "description": `page`,
+                "description": `page (optional. default is 0)`,
                 "in": "query",
                 "name": "page",
                 "required": false,
@@ -404,7 +406,43 @@ module.exports = {
                     "type": "integer"
                 }
             },
+            {
+                "description": `filter (searches all string fields)`,
+                "in": "query",
+                "name": "filter",
+                "required": false,
+                "schema": {
+                    "type": "string"
+                }
+            }
         ];
+
+        // filter constructs a where clause to search all text fields with case-insensitve search
+        // parameter_ix starts at 3 since $1 and $2 are used for limit and offset parameters.
+        // we pass the filter variable into the parameter list multiple times (once for each text column)
+        // because postgres does not allow the same parameter index to be used twice in the same query.
+
+        let where_clause = ``;
+        let where_parms = `,`;
+        let first_where = true;
+        let parameter_ix = 3;
+        //for all columns
+        for (column of columns){
+            //which are text
+            if (column.data_type == 'text'){
+                //make a where clause
+                where_clause += first_where ? 'where\n\t\t\t\t\t\t' : '\n\t\t\t\t\tor  ';
+                //like parameter index
+                where_clause += `${column.column_name} ilike $${parameter_ix}`;
+                //called filter
+                where_parms += `filter, `;
+                parameter_ix++;
+                first_where = false;
+            }
+        }
+        if (where_parms != ','){
+            where_parms.slice(0,-2);
+        }
 
         let api_method = `get_all`;
 
@@ -413,14 +451,22 @@ module.exports = {
 
                 try {
 
-                    // default pagesize is 10, max pagesize is 100
+                    // pagesize and page
+
                     let pagesize = Math.min(parseInt(req.query.pagesize || 10), 100);
-                    // default page is 0
                     let page = parseInt(req.query.page || 0);
                     let limit = pagesize;
                     let offset = pagesize * page;
 
-                    let result = await module.exports.${api_method}_p(limit, offset);
+                    //filter text fields 
+
+                    let filter = '%' + (req.query.filter || '') + '%';
+
+                    let result = await module.exports.${api_method}_p(
+                        limit, 
+                        offset,
+                        filter
+                    );
                     res.json(result);
                 }
                 catch (e){
@@ -431,19 +477,23 @@ module.exports = {
 
             },
 
-            ${api_method}_p: (limit, offset) => {
+            ${api_method}_p: (limit, offset, filter) => {
 
                 let sql = \`
                     select 
-                        ${column_names} 
+                        ${column_names_csv} 
                     from 
                         ${wrapped_table_name}
+                    ${where_clause}
                     limit $1
                     offset $2;
-                    
                 \`;
 
-                let parameters = [limit, offset];
+                let parameters = [
+                    limit, 
+                    offset
+                    ${where_parms}
+                ];
                 return db.query_promise(sql, parameters);
 
             },
@@ -463,7 +513,8 @@ module.exports = {
 
     generate_script_get_by_id: (
         table_name,
-        column_names,
+        columns, 
+        column_names_csv,
         wrapped_table_name
     ) => {
 
@@ -506,7 +557,7 @@ module.exports = {
 
                 let sql = \`
                     select 
-                        ${column_names} 
+                        ${column_names_csv} 
                     from 
                         ${wrapped_table_name}
                     where 
@@ -533,7 +584,8 @@ module.exports = {
 
     generate_script_get_by_uuid: (
         table_name,
-        column_names,
+        columns, 
+        column_names_csv,
         wrapped_table_name
     ) => {
 
@@ -575,7 +627,7 @@ module.exports = {
 
                 let sql = \`
                     select 
-                        ${column_names} 
+                        ${column_names_csv} 
                     from 
                         ${wrapped_table_name}
                     where 
