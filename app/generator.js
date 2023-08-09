@@ -221,6 +221,8 @@ module.exports = {
 
     ) => {
 
+        //attach a new endpoint to the openapi object to eventually be saved as a json file
+
         let {
             description,
             api_method_path,
@@ -230,10 +232,15 @@ module.exports = {
             script
         } = script_metadata;
 
+
+        // create the path stub (if it does not exist - we add multiple items to each path, eg. get/post/put/delete)
+
         if (!openapi_object.paths[api_method_path]) {
             openapi_object.paths[api_method_path] = {
             }
         }
+
+        //add the rest method
 
         openapi_object.paths[api_method_path][rest_method] = {
             parameters: parameters,
@@ -264,7 +271,7 @@ module.exports = {
         }
 
 
-        // for POST, attach a requestBody stub
+        // for POSTs, attach a requestBody stub
 
         if (rest_method == 'post') {
 
@@ -302,9 +309,27 @@ module.exports = {
 
                     properties[column.column_name] = {
                         description: column.column_name,
-                        example: ``,
                         type: data_type_convert_postgres_to_openapi[column.data_type] || column.data_type
                     }
+
+                    // add example
+
+                    switch (column.data_type) {
+                        case 'text':
+                            properties[column.column_name].example = column.column_name;
+                            break;
+                        case 'bigint':
+                            properties[column.column_name].example = 0;
+                            break;
+                        case 'uuid':
+                            properties[column.column_name].example = `00000000-0000-0000-0000-000000000000`;
+                            break;
+                        default:
+                            properties[column.column_name].example = ``;
+                            break;
+                    }
+
+                    // add format, if required
 
                     if (column.data_type == 'uuid') {
                         properties[column.column_name]['format'] = 'uuid';
@@ -727,7 +752,7 @@ module.exports = {
                 return column.column_name
             });
 
-        let column_names_without_id = column_names_array.join(', ').slice(0, -2);
+        let column_names_without_id = column_names_array.join(', ');
 
         //create a list of column parameter placeholders (eg. $1,$2,$3..)
         let dollar_index_parameter_list = ``;
