@@ -3,6 +3,9 @@ module.exports = {
 
     create_api_routes: (app, openAPIDef, apiPath) => {
 
+        // this function maps all the openapi endpoints specified in openapi.3.0.0.json 
+        // extracted from the operationId properties to corresponding functions in the /api folder.
+
         const fs = require("fs");
 
         //create controllers list by finding all folders in /api
