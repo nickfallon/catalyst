@@ -265,8 +265,8 @@ module.exports = {
         let stub_openapi_object = {
             openapi: "3.0.0",
             info: {
-                description: `Interactive API documentation for ${package.name}`,
-                title: `${package.name} API`,
+                description: `Interactive REST API documentation for ${package.name}`,
+                title: `${package.name} REST API`,
                 version: `${package.version}`
             },
             paths: {
@@ -377,7 +377,7 @@ module.exports = {
 
     generate_script_get_all: (
         table_name,
-        columns, 
+        columns,
         column_names_csv,
         wrapped_table_name
     ) => {
@@ -417,31 +417,20 @@ module.exports = {
             }
         ];
 
-        // filter constructs a where clause to search all text fields with case-insensitve search
-        // parameter_ix starts at 3 since $1 and $2 are used for limit and offset parameters.
-        // we pass the filter variable into the parameter list multiple times (once for each text column)
-        // because postgres does not allow the same parameter index to be used twice in the same query.
+        // the filter querystring paramter constructs a where clause 
+        // to search all text fields with case-insensitve search
 
         let where_clause = ``;
-        let where_parms = `,`;
         let first_where = true;
-        let parameter_ix = 3;
         //for all columns
-        for (column of columns){
-            //which are text
-            if (column.data_type == 'text'){
+        for (column of columns) {
+            //which are text or uuid
+            if (column.data_type == 'text') {
                 //make a where clause
                 where_clause += first_where ? 'where\n\t\t\t\t\t\t' : '\n\t\t\t\t\tor  ';
-                //like parameter index
-                where_clause += `${column.column_name} ilike $${parameter_ix}`;
-                //called filter
-                where_parms += `filter, `;
-                parameter_ix++;
+                where_clause += `${column.column_name} ilike $1`;
                 first_where = false;
             }
-        }
-        if (where_parms != ','){
-            where_parms.slice(0,-2);
         }
 
         let api_method = `get_all`;
@@ -485,14 +474,14 @@ module.exports = {
                     from 
                         ${wrapped_table_name}
                     ${where_clause}
-                    limit $1
-                    offset $2;
+                    limit $2
+                    offset $3;
                 \`;
 
                 let parameters = [
+                    filter,
                     limit, 
                     offset
-                    ${where_parms}
                 ];
                 return db.query_promise(sql, parameters);
 
@@ -513,7 +502,7 @@ module.exports = {
 
     generate_script_get_by_id: (
         table_name,
-        columns, 
+        columns,
         column_names_csv,
         wrapped_table_name
     ) => {
@@ -584,7 +573,7 @@ module.exports = {
 
     generate_script_get_by_uuid: (
         table_name,
-        columns, 
+        columns,
         column_names_csv,
         wrapped_table_name
     ) => {

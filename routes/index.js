@@ -5,7 +5,7 @@ module.exports = {
 
         const fs = require("fs");
 
-        //create controllers list
+        //create controllers list by finding all folders in /api
 
         let folder_names =
             fs.readdirSync('./api', { withFileTypes: true })
@@ -18,16 +18,20 @@ module.exports = {
             controllers[folder_name] = require(`../api/${folder_name}`);
         }
 
-        //get all controllers in the api folder
+        //get all rest endpoint paths in the api json file
 
         Object.keys(openAPIDef.paths).forEach(path => {
 
             // for each path
+
             const pathInfo = openAPIDef.paths[path];
 
             // for each method (get/post/put/delete)
+
             Object.keys(pathInfo).forEach(restMethod => {
+
                 // get the REST method, controller, function name and auth_type from openAPI def
+
                 const methodInfo = pathInfo[restMethod];
                 const operation = methodInfo.operationId.split("/");
                 const routerController = operation[0];
@@ -35,6 +39,7 @@ module.exports = {
                 const auth_type = operation[2];
 
                 // get the path and convert {parm} to :parm so express can use it as a route
+
                 const modifiedPath = module.exports.convertBracketsToColon(path);
                 const expressPath = `${apiPath}${modifiedPath}`;
 
@@ -42,6 +47,7 @@ module.exports = {
                 // console.log(`created route ${expressPath} --> ${routerController}.${routerMethod}`);
 
                 // create an express route
+
                 app[restMethod](
                     expressPath,
                     // validator.validate(restMethod, path),
@@ -59,6 +65,9 @@ module.exports = {
     },
 
     convertBracketsToColon: (path) => {
+
+        // convert openapi parameters in brackets to colons
+        // eg. {parm} to :parm so express can use it for routing
 
         let modifiedPath = path;
         while (modifiedPath.indexOf("{") > -1) {
