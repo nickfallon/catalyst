@@ -209,14 +209,14 @@ module.exports = {
 
     create_stub_openapi_object: () => {
 
-        let app_name = require('../package.json').name;
+        let package = require('../package.json');
 
         let stub_openapi_object = {
             openapi: "3.0.0",
             info: {
-                description: `Interactive API documentation for ${app_name}`,
-                title: `${app_name} API`,
-                version: "1.0.0"
+                description: `Interactive API documentation for ${package.name}`,
+                title: `${package.name} API`,
+                version: `${package.version}`
             },
             paths: {
                 "/": {

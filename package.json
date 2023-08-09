@@ -1,6 +1,6 @@
 {
   "name": "catalyst",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "",
   "engines": {
     "node": "^v17.0.1",
