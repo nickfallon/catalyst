@@ -62,7 +62,7 @@ module.exports = {
 
         return new Promise((resolve, reject) => {
 
-            if (dbConfig.debug_sql == 'true') {
+            if (dbConfig.debug_sql) {
                 console.log(sql, params);
             }
 

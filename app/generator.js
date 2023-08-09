@@ -47,6 +47,8 @@ module.exports = {
 
     get_public_tables: () => {
 
+        //get a list of tables from postgres in the public schema
+
         let sql = `
             select * from pg_tables
             where schemaname = 'public';
@@ -59,7 +61,7 @@ module.exports = {
     create_entity: async (table_name, openapi_object) => {
 
         // get the entity name and a wrapped (double-quoted) version if the table 
-        // name is reserved
+        // name is a reserved word in postgres (eg. "user"). expand this list as required.
 
         let wrapped_table_name = module.exports.wrap_reserved_table_names(table_name);
 
@@ -86,13 +88,16 @@ module.exports = {
                 }
             });
 
+        //check if this table has an 'id' or 'uuid' or both
+
         let has_id_field = columns.some(column => column.column_name == 'id');
         let has_uuid_field = columns.some(column => column.column_name == 'uuid');
 
         // join column names with commas for SQL building.
 
         let column_names = columns
-            // if the entity has a 'uuid' field, do not include the 'id' field
+            // if the entity has a 'uuid' field, do not include the 'id' field.
+            // the assumption is that if 'uuid' exists, we don't want to also leak 'id' in queries
             .filter((column) => {
                 return ((column.column_name != 'id') || !has_uuid_field)
             })
@@ -101,7 +106,7 @@ module.exports = {
             })
             .join(', ');
 
-        //create an entity sub-folder in the API folder
+        //create an entity sub-folder in the API folder to hold our api code for this entity
 
         let api_path = path.join(__dirname, '../api');
         let api_entity_path = `${api_path}/${table_name}`;
@@ -109,19 +114,22 @@ module.exports = {
             fs.mkdirSync(api_entity_path);
         }
 
-        // generate code file for entity
+        // create an array of scripts for this entity. 
+        // we'll join them together and write them as a single code file later.
 
         let scripts = [];
+
+        // create a module_start script (a 'header')
 
         let module_start = ``;
         module_start += `const db = require('../../db'); \n`;
         module_start += `\n`;
         module_start += `module.exports = { \n`;
-
-        let module_end = `\n}`;
-
         scripts.push(module_start);
 
+
+        // each API path we generate will return script_metadata
+        // which will contain the script and other assocatied info
 
         let script_metadata = {
             description: '',
@@ -132,24 +140,61 @@ module.exports = {
             script: ''
         };
 
+        // - generate scripts -
+
+        // create get_all
+
+        script_metadata = module.exports.generate_script_get_all(table_name, column_names, wrapped_table_name);
+        module.exports.attach_path_to_openapi_object(openapi_object, table_name, script_metadata);
+        scripts.push(script_metadata.script);
+
+
+        // create get_by_uuid or get_by_id
+
         // if this entity has a 'uuid' column, then REST access is by uuid eg. /users/{uuid}
         // otherwise, it's assumed to be 'id'.
         if (has_uuid_field) {
-            //has a uuid column
+
+            // has a uuid column
+
+            // create get_by_uuid
+
             script_metadata = module.exports.generate_script_get_by_uuid(table_name, column_names, wrapped_table_name);
             module.exports.attach_path_to_openapi_object(openapi_object, table_name, script_metadata);
             scripts.push(script_metadata.script);
         }
         else if (has_id_field) {
-            //has a uuid column
+
+            //has a id column
+
+            // create get_by_id
+
             script_metadata = module.exports.generate_script_get_by_id(table_name, column_names, wrapped_table_name);
             module.exports.attach_path_to_openapi_object(openapi_object, table_name, script_metadata);
             scripts.push(script_metadata.script);
         }
 
 
+        // get by other columns eg. get_by_email
+        // xz to do
+
+        // get all children by uuid
+        // xz to do 
+
+        // get all by status 
+        // xz to do 
+
+        // pagesize = 10 & page = 0
+        //(use SQL offset)
+
+        // - paging
+        // - sorting
+        // - filter/text search
 
 
+        //create a module_end script (a 'footer')
+
+        let module_end = `\n}`;
         scripts.push(module_end);
 
         //write the code file to the api entity sub-folder 
@@ -329,6 +374,93 @@ module.exports = {
 
     },
 
+    generate_script_get_all: (
+        table_name,
+        column_names,
+        wrapped_table_name
+    ) => {
+
+        let description = `Get all ${table_name}`;
+        description += description.endsWith('s') ? 'es' : 's';
+
+        let api_method_path = `/${table_name}/`;
+        let rest_method = 'get';
+        let parameters = [
+            {
+                "description": `pagesize`,
+                "in": "query",
+                "name": "pagesize",
+                "required": false,
+                "schema": {
+                    "type": "integer"
+                }
+            },
+            {
+                "description": `page`,
+                "in": "query",
+                "name": "page",
+                "required": false,
+                "schema": {
+                    "type": "integer"
+                }
+            },
+        ];
+
+        let api_method = `get_all`;
+
+        let script = `
+            ${api_method}: async (req, res) => {
+
+                try {
+
+                    // default pagesize is 10, max pagesize is 100
+                    let pagesize = Math.min(parseInt(req.query.pagesize || 10), 100);
+                    // default page is 0
+                    let page = parseInt(req.query.page || 0);
+                    let limit = pagesize;
+                    let offset = pagesize * page;
+
+                    let result = await module.exports.${api_method}_p(limit, offset);
+                    res.json(result);
+                }
+                catch (e){
+                    console.log(\`error in ${table_name} ${api_method}\`);
+                    console.log(e);
+                    res.json(e);
+                }
+
+            },
+
+            ${api_method}_p: (limit, offset) => {
+
+                let sql = \`
+                    select 
+                        ${column_names} 
+                    from 
+                        ${wrapped_table_name}
+                    limit $1
+                    offset $2;
+                    
+                \`;
+
+                let parameters = [limit, offset];
+                return db.query_promise(sql, parameters);
+
+            },
+
+        `;
+
+        return {
+            description,
+            api_method_path,
+            rest_method,
+            api_method,
+            parameters,
+            script
+        }
+
+    },
+
     generate_script_get_by_id: (
         table_name,
         column_names,
@@ -356,11 +488,15 @@ module.exports = {
             ${api_method}: async (req, res) => {
 
                 try {
+
                     let id = parseInt(req.params.id);
-                    let result = await module.exports.get_by_id_p(id);
+
+                    let result = await module.exports.${api_method}_p(id);
                     res.json(result);
                 }
                 catch (e){
+                    console.log(\`error in ${table_name} ${api_method}\`);
+                    console.log(e);
                     res.json(e);
                 }
 
@@ -424,10 +560,12 @@ module.exports = {
 
                 try {
                     let uuid = req.params.uuid;
-                    let result = await module.exports.get_by_uuid_p(uuid);
+                    let result = await module.exports.${api_method}_p(uuid);
                     res.json(result);
                 }
                 catch (e){
+                    console.log(\`error in ${table_name} ${api_method}\`);
+                    console.log(e);
                     res.json(e);
                 }
 
