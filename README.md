@@ -30,7 +30,7 @@ Use:
 
 In a browser, go to [https://localhost:9000/api/generator/build](https://localhost:9000/api/generator/build)
 
-The generator connects to a postgres database using the credentials in .env file.
+The generator connects to a postgres database using the credentials in `.env` file.
 it creates a file openapi.3.0.0.json and writes code to the /api folder to perform SQL queries.
 
 
