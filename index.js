@@ -24,53 +24,63 @@ if (process.env.localhost == 'true') {
     const key = fs.readFileSync("certs/localhost-key.pem", "utf-8");
     const cert = fs.readFileSync("certs/localhost.pem", "utf-8");
     server = https.createServer({ key, cert }, app).listen(port);
-    console.log(`https://localhost:${port}`);
+    console.log(`express running on: https://localhost:${port}`);
 }
 else {
     //prod
     server = app.listen(port, () => { });
 }
 
-//openapi
-const openapi_json_path = "./openapi.3.0.0.json"
-const openAPIDef = require(openapi_json_path);
-const apiPath = openAPIDef.servers[0].url;
 
 //api code generator
 let generator = require('./app/generator');
 app.get('/api/generator/build', generator.build);
 
-//openapi validation
-const OpenApiValidator = require('express-openapi-validator');
-app.use(
-    OpenApiValidator.middleware({
-        apiSpec: openapi_json_path,
-        validateRequests: true,
-        validateResponses: true,
-        ignorePaths: (path) => path.includes('/api-docs/')
-    }),
-);
-app.use((err, req, res, next) => {
-    res.status(err.status || 500).json({
-        message: `openapi-validator: ${err.message}`,
-        errors: err.errors,
+//try to consume the openapi specification, if it exists
+try {
+
+    //openapi
+    const openapi_json_path = "./openapi.3.0.0.json"
+    const openAPIDef = require(openapi_json_path);
+    const apiPath = openAPIDef.servers[0].url;
+
+    //openapi validation
+    const OpenApiValidator = require('express-openapi-validator');
+    app.use(
+        OpenApiValidator.middleware({
+            apiSpec: openapi_json_path,
+            validateRequests: true,
+            validateResponses: true,
+            ignorePaths: (path) => path.includes('/api-docs/')
+        }),
+    );
+    app.use((err, req, res, next) => {
+        res.status(err.status || 500).json({
+            message: `openapi-validator: ${err.message}`,
+            errors: err.errors,
+        });
     });
-});
 
-//openapi interactive swagger docs
-const swaggerUi = require("swagger-ui-express");
-const swaggerConfig = require("./routes/swaggerUI/config");
-app.use(
-    `${apiPath}/api-docs`,
-    swaggerUi.serve,
-    swaggerUi.setup(openAPIDef, swaggerConfig)
-);
+    //openapi interactive swagger docs
+    const swaggerUi = require("swagger-ui-express");
+    const swaggerConfig = require("./routes/swaggerUI/config");
+    app.use(
+        `${apiPath}/api-docs`,
+        swaggerUi.serve,
+        swaggerUi.setup(openAPIDef, swaggerConfig)
+    );
 
-//openapi routes
-let routes = require("./routes");
-routes.create_api_routes(app, openAPIDef, apiPath);
+    //openapi routes
+    let routes = require("./routes");
+    routes.create_api_routes(app, openAPIDef, apiPath);
 
-console.log('to generate API: https://localhost:9000/api/generator/build');
+}
+catch (e) {
+    console.log(e);
+}
+
+console.log(`generate API: https://localhost:${port}/api/generator/build`);
+console.log(`API interactive docs: https://localhost:${port}/api/v1/api-docs/`);
 
 module.exports = {
     server: server,

@@ -71,6 +71,31 @@ module.exports = {
 
         let fks = await module.exports.get_fks_for_table(`${wrapped_table_name}`);
 
+        // get columns for entity
+        let columns = (await module.exports.
+            get_columns_for_table(`${table_name}`))
+            .map((column) => {
+                return {
+                    column_name: column.column_name,
+                    data_type: column.data_type
+                }
+            });
+
+        let has_id_field = columns.some(column => column.column_name == 'id');
+        let has_uuid_field = columns.some(column => column.column_name == 'uuid');
+
+        // join column names with commas for SQL building.
+
+        let column_names = columns
+            // if the entity has a 'uuid' field, do not include the 'id' field
+            .filter((column) => {
+                return ((column.column_name != 'id') || !has_uuid_field)
+            })
+            .map((column) => {
+                return column.column_name
+            })
+            .join(', ');
+
         //create an entity sub-folder in the API folder
 
         let api_path = path.join(__dirname, '../api');
@@ -92,29 +117,33 @@ module.exports = {
 
         scripts.push(module_start);
 
-        let {
-            description,
-            api_method_path,
-            rest_method,
-            api_method,
-            parameters,
-            script
-        } = module.exports.generate_script_get_by_id(
-            table_name,
-            wrapped_table_name
-        );
 
-        module.exports.attach_path_to_openapi_object(
-            openapi_object,
-            table_name,
-            description,
-            api_method_path,
-            rest_method,
-            api_method,
-            parameters,
-            script);
+        let script_metadata = {
+            description: '',
+            api_method_path: '',
+            rest_method: '',
+            api_method: '',
+            parameters: [],
+            script: ''
+        };
 
-        scripts.push(script);
+        // if this entity has a 'uuid' column, then REST access is by uuid eg. /users/{uuid}
+        // otherwise, it's assumed to be 'id'.
+        if (has_uuid_field) {
+            //has a uuid column
+            script_metadata = module.exports.generate_script_get_by_uuid(table_name, column_names, wrapped_table_name);
+            module.exports.attach_path_to_openapi_object(openapi_object, table_name, script_metadata);
+            scripts.push(script_metadata.script);
+        }
+        else if (has_id_field) {
+            //has a uuid column
+            script_metadata = module.exports.generate_script_get_by_id(table_name, column_names, wrapped_table_name);
+            module.exports.attach_path_to_openapi_object(openapi_object, table_name, script_metadata);
+            scripts.push(script_metadata.script);
+        }
+
+
+
 
         scripts.push(module_end);
 
@@ -132,13 +161,18 @@ module.exports = {
     attach_path_to_openapi_object: (
         openapi_object,
         table_name,
-        description,
-        api_method_path,
-        rest_method,
-        api_method,
-        parameters,
-        script
+        script_metadata
+
     ) => {
+
+        let {
+            description,
+            api_method_path,
+            rest_method,
+            api_method,
+            parameters,
+            script
+        } = script_metadata;
 
         openapi_object.paths[api_method_path] = {
         }
@@ -175,11 +209,13 @@ module.exports = {
 
     create_stub_openapi_object: () => {
 
+        let app_name = require('../package.json').name;
+
         let stub_openapi_object = {
             openapi: "3.0.0",
             info: {
-                description: "OpenAPI 3.0 description",
-                title: "OpenAPI 3.0 REST API",
+                description: `Interactive API documentation for ${app_name}`,
+                title: `${app_name} API`,
                 version: "1.0.0"
             },
             paths: {
@@ -187,7 +223,12 @@ module.exports = {
                     get: {
                         responses: {
                             200: {
-                                "description": "successful operation"
+                                "description": "successful operation",
+                                "content": {
+                                    "application/json": {
+                                        "schema": {}
+                                    }
+                                }
                             },
                             400: {
                                 "description": "Bad Request"
@@ -243,6 +284,21 @@ module.exports = {
 
     },
 
+    get_columns_for_table: (table_name) => {
+
+        let sql = `
+            select *
+            from information_schema.columns
+            where 
+                table_schema = 'public'
+            and table_name = $1;                
+        `;
+
+        let parameters = [table_name];
+        return db.query_promise(sql, parameters);
+
+    },
+
     get_fks_for_table: (table_name) => {
 
         // if the table name is a reserved word 'eg. user) we 
@@ -270,6 +326,7 @@ module.exports = {
 
     generate_script_get_by_id: (
         table_name,
+        column_names,
         wrapped_table_name
     ) => {
 
@@ -307,14 +364,86 @@ module.exports = {
             ${api_method}_p: (id) => {
 
                 let sql = \`
-                    select * from ${wrapped_table_name}
-                    where id = $1;
+                    select 
+                        ${column_names} 
+                    from 
+                        ${wrapped_table_name}
+                    where 
+                        id = $1;
                 \`;
 
                 let parameters = [id];
                 return db.query_promise(sql, parameters);
 
+            },
+
+        `;
+
+        return {
+            description,
+            api_method_path,
+            rest_method,
+            api_method,
+            parameters,
+            script
+        }
+
+    },
+
+    generate_script_get_by_uuid: (
+        table_name,
+        column_names,
+        wrapped_table_name
+    ) => {
+
+        let description = `Get ${table_name} by uuid`;
+        let api_method_path = `/${table_name}/{uuid}`;
+        let rest_method = 'get';
+        let parameters = [
+            {
+                "description": `${table_name} uuid`,
+                "in": "path",
+                "name": "uuid",
+                "required": true,
+                "schema": {
+                    "type": "string",
+                    "format": "uuid"
+                }
             }
+        ];
+
+        let api_method = `get_by_uuid`;
+
+        let script = `
+            ${api_method}: async (req, res) => {
+
+                try {
+                    let uuid = req.params.uuid;
+                    let result = await module.exports.get_by_uuid_p(uuid);
+                    res.json(result);
+                }
+                catch (e){
+                    res.json(e);
+                }
+
+            },
+
+            ${api_method}_p: (uuid) => {
+
+                let sql = \`
+                    select 
+                        ${column_names} 
+                    from 
+                        ${wrapped_table_name}
+                    where 
+                        uuid = $1;
+                \`;
+
+                let parameters = [uuid];
+                return db.query_promise(sql, parameters);
+
+            },
+
         `;
 
         return {

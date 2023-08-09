@@ -39,7 +39,7 @@ module.exports = {
                 const expressPath = `${apiPath}${modifiedPath}`;
 
                 // output a list of routes to the console
-                console.log(`created route ${expressPath} --> ${routerController}.${routerMethod}`);
+                // console.log(`created route ${expressPath} --> ${routerController}.${routerMethod}`);
 
                 // create an express route
                 app[restMethod](
