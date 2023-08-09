@@ -8,7 +8,7 @@ module.exports = {
     build: async (req, res) => {
 
         // generates a REST API based on the database specified in the .env file. 
-        // - the generated code is written to /api
+        // - the generated code is written to /api, one folder per table.
         // - a json file called openapi.3.0.0.json is written to the app root.
         // after restarting the app, the API is available for use at /api/v1/api-docs.
 
@@ -41,7 +41,6 @@ module.exports = {
         fs.writeFileSync(api_json_file, JSON.stringify(openapi_object));
 
         res.json({ msg: 'build complete' });
-
 
     },
 
@@ -146,7 +145,7 @@ module.exports = {
         // create get_all
 
         script_metadata = module.exports.generate_script_get_all(table_name, columns, column_names_csv, wrapped_table_name);
-        module.exports.attach_path_to_openapi_object(openapi_object, table_name, script_metadata);
+        module.exports.attach_path_to_openapi_object(openapi_object, table_name, columns, script_metadata);
         scripts.push(script_metadata.script);
 
 
@@ -161,7 +160,7 @@ module.exports = {
             // create get_by_uuid
 
             script_metadata = module.exports.generate_script_get_by_uuid(table_name, columns, column_names_csv, wrapped_table_name);
-            module.exports.attach_path_to_openapi_object(openapi_object, table_name, script_metadata);
+            module.exports.attach_path_to_openapi_object(openapi_object, table_name, columns, script_metadata);
             scripts.push(script_metadata.script);
         }
         else if (has_id_field) {
@@ -171,10 +170,15 @@ module.exports = {
             // create get_by_id
 
             script_metadata = module.exports.generate_script_get_by_id(table_name, columns, column_names_csv, wrapped_table_name);
-            module.exports.attach_path_to_openapi_object(openapi_object, table_name, script_metadata);
+            module.exports.attach_path_to_openapi_object(openapi_object, table_name, columns, script_metadata);
             scripts.push(script_metadata.script);
         }
 
+
+        // create insert
+        script_metadata = module.exports.generate_script_insert(table_name, columns, column_names_csv, wrapped_table_name);
+        module.exports.attach_path_to_openapi_object(openapi_object, table_name, columns, script_metadata);
+        scripts.push(script_metadata.script);
 
         // get by other columns eg. get_by_email
         // xz to do
@@ -212,6 +216,7 @@ module.exports = {
     attach_path_to_openapi_object: (
         openapi_object,
         table_name,
+        columns,
         script_metadata
 
     ) => {
@@ -225,7 +230,9 @@ module.exports = {
             script
         } = script_metadata;
 
-        openapi_object.paths[api_method_path] = {
+        if (!openapi_object.paths[api_method_path]) {
+            openapi_object.paths[api_method_path] = {
+            }
         }
 
         openapi_object.paths[api_method_path][rest_method] = {
@@ -254,6 +261,63 @@ module.exports = {
             tags: [
                 `${table_name}`
             ]
+        }
+
+
+        // for POST, attach a requestBody stub
+
+        if (rest_method == 'post') {
+
+            openapi_object.paths[api_method_path][rest_method]['requestBody'] = {
+                content: {
+                    "application/json": {
+                        schema: {
+                            properties: {
+                            },
+                            required: [
+                            ],
+                            type: `object`
+                        }
+                    }
+                },
+                description: `Create ${table_name}`
+            }
+
+            //populate the requestBody stub
+
+            let properties = openapi_object.paths[api_method_path][rest_method]['requestBody']['content']['application/json']['schema']['properties'];
+            let required = openapi_object.paths[api_method_path][rest_method]['requestBody']['content']['application/json']['schema']['required'];
+
+            let data_type_convert_postgres_to_openapi = {
+                'text': 'string',
+                'bigint': 'integer',
+                'uuid': 'string'
+            }
+
+            for (column of columns) {
+
+                if (column.column_name != 'id') {
+
+                    // populate properties list of requestBody
+
+                    properties[column.column_name] = {
+                        description: column.column_name,
+                        example: ``,
+                        type: data_type_convert_postgres_to_openapi[column.data_type] || column.data_type
+                    }
+
+                    if (column.data_type == 'uuid') {
+                        properties[column.column_name]['format'] = 'uuid';
+                    }
+
+                    // populate required array of requestBody
+
+                    required.push(column.column_name);
+
+                }
+            }
+
+
         }
 
     },
@@ -639,6 +703,89 @@ module.exports = {
             script
         }
 
-    }
+    },
+
+    generate_script_insert: (
+        table_name,
+        columns,
+        column_names_csv,
+        wrapped_table_name
+    ) => {
+
+        let description = `Insert ${table_name}`;
+
+        let api_method_path = `/${table_name}/`;
+        let rest_method = 'post';
+        let parameters = [];
+
+        let column_names_array = columns
+            // do not include the 'id' field - assume it's a auto-populating serial.
+            .filter((column) => {
+                return (column.column_name != 'id')
+            })
+            .map((column) => {
+                return column.column_name
+            });
+
+        let column_names_without_id = column_names_array.join(', ').slice(0, -2);
+
+        //create a list of column parameter placeholders (eg. $1,$2,$3..)
+        let dollar_index_parameter_list = ``;
+        for (var i = 0; i < column_names_array.length; i++) {
+            dollar_index_parameter_list += `$${(i + 1)},`;
+        }
+        if (column_names_array.length) {
+            dollar_index_parameter_list = dollar_index_parameter_list.slice(0, -1);
+        }
+
+        let api_method = `insert`;
+
+        let script = `
+            ${api_method}: async (req, res) => {
+
+                let { ${column_names_without_id} } = req.body;
+
+                try {
+                    let result = await module.exports.${api_method}_p(${column_names_without_id});
+                    res.json(result);
+                }
+                catch (e){
+                    console.log(\`error in ${table_name} ${api_method}\`);
+                    console.log(e);
+                    res.json(e);
+                }
+
+            },
+
+            ${api_method}_p: ( ${column_names_without_id} ) => {
+
+                let sql = \`
+                    insert into ${wrapped_table_name} (
+                        ${column_names_csv} 
+                    )
+                    values (
+                        ${dollar_index_parameter_list}
+                    );
+                \`;
+
+                let parameters = [
+                    ${column_names_without_id} 
+                ];
+                return db.query_promise(sql, parameters);
+
+            },
+
+        `;
+
+        return {
+            description,
+            api_method_path,
+            rest_method,
+            api_method,
+            parameters,
+            script
+        }
+
+    },
 
 }

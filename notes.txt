@@ -1,9 +1,5 @@
 
 
-- authentication scheme - who can do what?
-
-
-
 to run: 
 
 npm run dev 
@@ -17,6 +13,12 @@ Re-start the app.
 
 In a browser, go to  https://localhost:9000/api/v1/api-docs to see interactive API docs.
 you must provide an Authorization Bearer header (any value) to perform calls.
+
+
+
+opinions:
+
+- tables are assumed to have an 'id' field of type serial (primary key), and optionally a uuid field.
 
 
 
