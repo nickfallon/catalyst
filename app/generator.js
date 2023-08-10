@@ -83,7 +83,8 @@ module.exports = {
             .map((column) => {
                 return {
                     column_name: column.column_name,
-                    data_type: column.data_type
+                    data_type: column.data_type,
+                    column_default: column.column_default
                 }
             });
 
@@ -744,9 +745,9 @@ module.exports = {
         let parameters = [];
 
         let column_names_array = columns
-            // do not include the 'id' field - assume it's a auto-populating serial.
+            // do not include the 'id' field - we assume it's an auto-updating serial field
             .filter((column) => {
-                return (column.column_name != 'id')
+                return column.column_name != 'id'
             })
             .map((column) => {
                 return column.column_name
@@ -757,10 +758,10 @@ module.exports = {
         //create a list of column parameter placeholders (eg. $1,$2,$3..)
         let dollar_index_parameter_list = ``;
         for (var i = 0; i < column_names_array.length; i++) {
-            dollar_index_parameter_list += `$${(i + 1)},`;
+            dollar_index_parameter_list += `$${(i + 1)}, `;
         }
         if (column_names_array.length) {
-            dollar_index_parameter_list = dollar_index_parameter_list.slice(0, -1);
+            dollar_index_parameter_list = dollar_index_parameter_list.slice(0, -2);
         }
 
         let api_method = `insert`;
@@ -786,10 +787,10 @@ module.exports = {
 
                 let sql = \`
                     insert into ${wrapped_table_name} (
-                        ${column_names_csv} 
+                        ${column_names_without_id} 
                     )
-                    values (
-                        ${dollar_index_parameter_list}
+                    values ( 
+                        ${dollar_index_parameter_list} 
                     );
                 \`;
 
