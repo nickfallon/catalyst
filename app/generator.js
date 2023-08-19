@@ -16,6 +16,9 @@ module.exports = {
 
         let openapi_object = module.exports.create_stub_openapi_object();
 
+        //create enums object (for status tables)
+        let enums_object = {};
+
         //get public tables from postgres
 
         let tables = await module.exports.get_public_tables();
@@ -28,11 +31,47 @@ module.exports = {
         }
         table_names.sort();
 
-        //create entity code for each table
+        //for each table
 
         for (table of table_names) {
+
+            //create the entity 
+
             await module.exports.create_entity(table, openapi_object);
+
+            //if table_name is '_status', create enums
+            if (table.endsWith('_status')) {
+                enums_object[table] = {};
+                let status_records = await module.exports.get_all_in_table(table);
+                for (var status_record of status_records) {
+                    let this_enum = {};
+                    for (var status_record_column in status_record) {
+                        if (status_record_column == 'id') {
+                            this_enum.value = parseInt(status_record[status_record_column]);
+                        }
+                        else {
+                            this_enum.key = status_record[status_record_column];
+                        }
+                    }
+                    enums_object[table][this_enum.key] = this_enum.value;
+                }
+            }
         }
+
+        //write the enums api file
+        let api_path = path.join(__dirname, '../api');
+        let enum_path = `${api_path}/enums`;
+        let enum_file_path = `${enum_path}/index.js`;
+        if (!fs.existsSync(enum_path)) {
+            fs.mkdirSync(enum_path);
+        }
+
+        let enums_file = ``;
+        enums_file += `\n`;
+        enums_file += `module.exports = \n`;
+        enums_file += module.exports.stringify_noquotes(enums_object);
+        enums_file += `\n`;
+        fs.writeFileSync(enum_file_path, enums_file);
 
         //write the openapi json file
 
@@ -42,6 +81,14 @@ module.exports = {
 
         res.json({ msg: 'build complete' });
 
+    },
+
+    stringify_noquotes: (obj) => {
+        var cleaned = JSON.stringify(obj, null, 2);
+
+        return cleaned.replace(/^[\t ]*"[^:\n\r]+(?<!\\)":/gm, function (match) {
+            return match.replace(/"/g, "");
+        });
     },
 
     get_public_tables: () => {
@@ -54,6 +101,56 @@ module.exports = {
         `;
         let parameters = [];
         return db.query_promise(sql, parameters);
+
+    },
+
+    get_all_in_table: (table_name) => {
+
+        //get all in table
+
+        let sql = `
+            select * from ${table_name};
+        `;
+        let parameters = [];
+        return db.query_promise(sql, parameters);
+
+    },
+
+    get_column_info: async (table_name) => {
+
+        let wrapped_table_name = module.exports.wrap_reserved_table_names(table_name);
+
+        // get columns for entity
+        let columns = (await module.exports.
+            get_columns_for_table(`${table_name}`))
+            .map((column) => {
+                return {
+                    column_name: column.column_name,
+                    data_type: column.data_type,
+                    column_default: column.column_default
+                }
+            });
+
+        let has_uuid_field = columns.some(column => column.column_name == 'uuid');
+
+        // join column names with commas for SQL building.
+
+        let column_names_array = columns
+            // if the entity has a 'uuid' field, do not include the 'id' field.
+            // the assumption is that if 'uuid' exists, we don't want to also leak 'id' in queries
+            .filter((column) => {
+                return ((column.column_name != 'id') || !has_uuid_field)
+            })
+            .map((column) => {
+                return `${wrapped_table_name}.${column.column_name}`
+            });
+
+        let column_names_csv = column_names_array.join(', ');
+
+        return {
+            columns,
+            column_names_csv
+        }
 
     },
 
@@ -73,39 +170,16 @@ module.exports = {
             }
         );
 
-        // get foreign keys for entity
+        // get child tables
 
-        let fks = await module.exports.get_fks_for_table(`${wrapped_table_name}`);
+        let children = await module.exports.get_children_of_table(`${table_name}`);
 
-        // get columns for entity
-        let columns = (await module.exports.
-            get_columns_for_table(`${table_name}`))
-            .map((column) => {
-                return {
-                    column_name: column.column_name,
-                    data_type: column.data_type,
-                    column_default: column.column_default
-                }
-            });
+        let { columns, column_names_csv } = await module.exports.get_column_info(table_name);
 
         //check if this table has an 'id' or 'uuid' or both
 
         let has_id_field = columns.some(column => column.column_name == 'id');
         let has_uuid_field = columns.some(column => column.column_name == 'uuid');
-
-        // join column names with commas for SQL building.
-
-        let column_names_array = columns
-            // if the entity has a 'uuid' field, do not include the 'id' field.
-            // the assumption is that if 'uuid' exists, we don't want to also leak 'id' in queries
-            .filter((column) => {
-                return ((column.column_name != 'id') || !has_uuid_field)
-            })
-            .map((column) => {
-                return column.column_name
-            });
-
-        let column_names_csv = column_names_array.join(', ');
 
         //create an entity sub-folder in the API folder to hold our api code for this entity
 
@@ -150,6 +224,34 @@ module.exports = {
         scripts.push(script_metadata.script);
 
 
+        // create get_all_childen
+
+        for (var child of children) {
+
+            let child_column_info = await module.exports.get_column_info(child.table_name);
+            let child_columns = child_column_info.columns;
+            let child_column_names_csv = child_column_info.column_names_csv;
+            let wrapped_child_table_name = module.exports.wrap_reserved_table_names(child.table_name);
+
+            script_metadata = module.exports.generate_script_get_all_children(
+                table_name,
+                child,
+                child.table_name,
+                child_columns,
+                child_column_names_csv,
+                wrapped_table_name,
+                wrapped_child_table_name
+            );
+            module.exports.attach_path_to_openapi_object(
+                openapi_object,
+                table_name,
+                child_columns,
+                script_metadata
+            );
+            scripts.push(script_metadata.script);
+
+        }
+
         // create get_by_uuid or get_by_id
 
         // if this entity has a 'uuid' column, then REST access is by uuid eg. /users/{uuid}
@@ -189,14 +291,6 @@ module.exports = {
 
         // get all by status 
         // xz to do 
-
-        // pagesize = 10 & page = 0
-        //(use SQL offset)
-
-        // - paging
-        // - sorting
-        // - filter/text search
-
 
         //create a module_end script (a 'footer')
 
@@ -241,7 +335,7 @@ module.exports = {
             }
         }
 
-        //add the rest method
+        //add the rest method to the paths 
 
         openapi_object.paths[api_method_path][rest_method] = {
             parameters: parameters,
@@ -251,9 +345,11 @@ module.exports = {
             responses: {
                 200: {
                     description: "successful operation",
-                    "content": {
+                    content: {
                         "application/json": {
-                            "schema": {}
+                            schema: {
+                                $ref: `#/components/schemas/${table_name}`
+                            }
                         }
                     }
                 },
@@ -269,7 +365,7 @@ module.exports = {
             tags: [
                 `${table_name}`
             ]
-        }
+        };
 
 
         // for POSTs, attach a requestBody stub
@@ -291,9 +387,23 @@ module.exports = {
                 description: `Create ${table_name}`
             }
 
-            //populate the requestBody stub
+            //set the POST requestBody to a new schema
 
-            let properties = openapi_object.paths[api_method_path][rest_method]['requestBody']['content']['application/json']['schema']['properties'];
+            openapi_object.paths[api_method_path][rest_method]['requestBody']['content']['application/json']['schema']['$ref'] =
+                `#/components/schemas/${table_name}`;
+
+
+            // add the schema for this entity to the components
+
+            openapi_object.components.schemas[table_name] = {
+                type: "object",
+                properties: {
+                }
+            };
+
+            //properties points to the entity schema properties node so we can populate it
+            let properties = openapi_object.components.schemas[table_name].properties;
+
             let required = openapi_object.paths[api_method_path][rest_method]['requestBody']['content']['application/json']['schema']['required'];
 
             let data_type_convert_postgres_to_openapi = {
@@ -301,6 +411,8 @@ module.exports = {
                 'bigint': 'integer',
                 'uuid': 'string'
             }
+
+            //create the schema
 
             for (column of columns) {
 
@@ -401,6 +513,9 @@ module.exports = {
                 }
             ],
             components: {
+                schemas: {
+
+                },
                 securitySchemes: {
                     bearerAuth: {
                         type: "http",
@@ -445,25 +560,69 @@ module.exports = {
         // if the table name is a reserved word 'eg. user) we 
         // we can only find its foreign keys by wrapping the name in double quotes
 
-        let sql = `
-            select 
-                conrelid::regclass AS table_name, 
-                conname AS foreign_key, 
-                pg_get_constraintdef(oid) 
-            from 
-                pg_constraint 
-            where  
-                contype = 'f' 
-            and connamespace = 'public'::regnamespace  
-            and conrelid::regclass::text = $1
-            order by 
-                conrelid::regclass::text, contype DESC;
+        let sql = `				
+			select
+                tc.table_schema, 
+                tc.constraint_name, 
+                tc.table_name, 
+                kcu.column_name, 
+                ccu.table_schema AS foreign_table_schema,
+                ccu.table_name AS foreign_table_name,
+                ccu.column_name AS foreign_column_name 
+            from
+                information_schema.table_constraints AS tc 
+            join information_schema.key_column_usage AS kcu
+            on 
+                tc.constraint_name = kcu.constraint_name
+            and tc.table_schema = kcu.table_schema
+            join information_schema.constraint_column_usage AS ccu
+            on 
+                ccu.constraint_name = tc.constraint_name
+            and ccu.table_schema = tc.table_schema
+            where 
+                tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = $1;
             `;
 
         let parameters = [table_name];
         return db.query_promise(sql, parameters);
 
     },
+
+    get_children_of_table: (table_name) => {
+
+        //get children of this table
+        //by checking foreign keys in other tables which match our table name
+
+        let sql = `				
+			select
+                tc.table_schema, 
+                tc.constraint_name, 
+                tc.table_name, 
+                kcu.column_name, 
+                ccu.table_schema AS foreign_table_schema,
+                ccu.table_name AS foreign_table_name,
+                ccu.column_name AS foreign_column_name 
+            from
+                information_schema.table_constraints AS tc 
+            join information_schema.key_column_usage AS kcu
+            on 
+                tc.constraint_name = kcu.constraint_name
+            and tc.table_schema = kcu.table_schema
+            join information_schema.constraint_column_usage AS ccu
+            on 
+                ccu.constraint_name = tc.constraint_name
+            and ccu.table_schema = tc.table_schema
+            where 
+                tc.constraint_type = 'FOREIGN KEY' 
+            --and tc.table_name = $1;
+            and ccu.table_name = $1;
+            `;
+
+        let parameters = [table_name];
+        return db.query_promise(sql, parameters);
+
+    },
+
 
     generate_script_get_all: (
         table_name,
@@ -549,7 +708,7 @@ module.exports = {
                     res.json(result);
                 }
                 catch (e){
-                    console.log(\`error in ${table_name} ${api_method}\`);
+                    console.log(\`error in ${api_method_path}\`);
                     console.log(e);
                     res.json(e);
                 }
@@ -572,6 +731,169 @@ module.exports = {
                     filter,
                     limit, 
                     offset
+                ];
+                return db.query_promise(sql, parameters);
+
+            },
+
+        `;
+
+        return {
+            description,
+            api_method_path,
+            rest_method,
+            api_method,
+            parameters,
+            script
+        }
+
+    },
+
+    generate_script_get_all_children: (
+        table_name,
+        child,
+        child_table_name,
+        child_columns,
+        child_column_names_csv,
+        wrapped_table_name,
+        wrapped_child_table_name
+    ) => {
+
+        //get all children of parent
+
+        let description = `Get all ${child_table_name}`;
+        description += description.endsWith('s') ? 'es' : 's';
+        description += ` of ${table_name}`;
+
+        let api_method_path = `/${table_name}/{id}/${child_table_name}`;
+        let rest_method = 'get';
+        let parameters = [
+            {
+                "description": `${table_name} id`,
+                "in": "path",
+                "name": "id",
+                "required": true,
+                "schema": {
+                    "type": "integer"
+                }
+            },
+            {
+                "description": `pagesize (optional. default is 10, max is 100)`,
+                "in": "query",
+                "name": "pagesize",
+                "required": false,
+                "schema": {
+                    "type": "integer"
+                }
+            },
+            {
+                "description": `page (optional. default is 0)`,
+                "in": "query",
+                "name": "page",
+                "required": false,
+                "schema": {
+                    "type": "integer"
+                }
+            },
+            {
+                "description": `filter (searches all string fields)`,
+                "in": "query",
+                "name": "filter",
+                "required": false,
+                "schema": {
+                    "type": "string"
+                }
+            }
+        ];
+
+        // the filter querystring paramter constructs a where clause 
+        // to search all text fields with case-insensitve search
+
+        let where_clause = `where`;
+        let first_where = true;
+        //for all child columns
+
+        //xz to fix  - hardcoded id..
+
+        where_clause += `(${wrapped_table_name}.id = $1)`;
+
+
+        let text_fields_exist = false;
+        for (column of child_columns) {
+            //which are text or uuid
+            if (column.data_type == 'text') {
+                text_fields_exist = true;
+                //make a where clause
+                where_clause += first_where ? 'and \n\t\t\t\t\t\t' : '\n\t\t\t\t\tor  ';
+                where_clause += `${column.column_name} ilike $4`;
+                first_where = false;
+            }
+        }
+
+
+        let api_method = `get_all_${child_table_name}_of_${table_name}`;
+
+        let script = `
+            ${api_method}: async (req, res) => {
+
+                try {
+
+                    let id = parseInt(req.params.id);
+
+                    // pagesize and page
+
+                    let pagesize = Math.min(parseInt(req.query.pagesize || 10), 100);
+                    let page = parseInt(req.query.page || 0);
+                    let limit = pagesize;
+                    let offset = pagesize * page;
+
+                    //filter text fields 
+
+                    let filter = '%' + (req.query.filter || '') + '%';
+
+                    let result = await module.exports.${api_method}_p(
+                        id,
+                        limit, 
+                        offset,
+                        filter
+                    );
+                    res.json(result);
+                }
+                catch (e){
+                    console.log(\`error in ${api_method_path}\`);
+                    console.log(e);
+                    res.json(e);
+                }
+
+            },
+
+            ${api_method}_p: (id, limit, offset, filter) => {
+
+                let sql = \`
+                    select 
+                        ${child_column_names_csv} 
+                    from 
+                        ${wrapped_child_table_name}
+                    join ${wrapped_table_name} on ${wrapped_table_name}.${child.foreign_column_name} = ${wrapped_child_table_name}.${child.column_name}
+                    ${where_clause}
+                    limit $2
+                    offset $3;
+                \`;
+
+                let parameters = [
+                    id,
+                    limit, 
+                    offset
+        `;
+
+        //xz - is there a better way? also this may be needed in get_all..
+        if (text_fields_exist) {
+            script +=
+                `           ,filter`;
+        }
+
+        script +=
+            `
                 ];
                 return db.query_promise(sql, parameters);
 
@@ -625,7 +947,7 @@ module.exports = {
                     res.json(result);
                 }
                 catch (e){
-                    console.log(\`error in ${table_name} ${api_method}\`);
+                    console.log(\`error in ${api_method_path}\`);
                     console.log(e);
                     res.json(e);
                 }
@@ -695,7 +1017,7 @@ module.exports = {
                     res.json(result);
                 }
                 catch (e){
-                    console.log(\`error in ${table_name} ${api_method}\`);
+                    console.log(\`error in ${api_method_path}\`);
                     console.log(e);
                     res.json(e);
                 }
@@ -776,7 +1098,7 @@ module.exports = {
                     res.json(result);
                 }
                 catch (e){
-                    console.log(\`error in ${table_name} ${api_method}\`);
+                    console.log(\`error in ${api_method_path}\`);
                     console.log(e);
                     res.json(e);
                 }
@@ -812,6 +1134,7 @@ module.exports = {
             script
         }
 
-    },
+    }
+
 
 }
