@@ -66,11 +66,7 @@ module.exports = {
             fs.mkdirSync(enum_path);
         }
 
-        let enums_file = ``;
-        enums_file += `\n`;
-        enums_file += `module.exports = \n`;
-        enums_file += module.exports.stringify_noquotes(enums_object);
-        enums_file += `\n`;
+        let enums_file = `module.exports = ` + module.exports.stringify_noquotes(enums_object);
         fs.writeFileSync(enum_file_path, enums_file);
 
         //write the openapi json file
@@ -84,8 +80,10 @@ module.exports = {
     },
 
     stringify_noquotes: (obj) => {
-        var cleaned = JSON.stringify(obj, null, 2);
 
+        // convert an object into a string, remove quotes from property names
+
+        var cleaned = JSON.stringify(obj, null, 2);
         return cleaned.replace(/^[\t ]*"[^:\n\r]+(?<!\\)":/gm, function (match) {
             return match.replace(/"/g, "");
         });
