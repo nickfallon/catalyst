@@ -15,6 +15,12 @@ In a browser, go to  https://localhost:9000/api/v1/api-docs to see interactive A
 you must provide an Authorization Bearer header (any value) to perform calls.
 
 
+notes:
+
+- BEWARE bad data in the database eg. missing UUIDs! trying to retrieve rows using GET will
+trigger the openAPI validator and fail to return any data at all. recommend that NOT NULL
+is enforced on UUID columns.
+
 
 opinions:
 
