@@ -67,7 +67,7 @@ try {
         }),
     );
 
-    // bounce openapi validation errors
+    // bounce openapi validation errors with a HTTP 500 error
 
     app.use((err, req, res, next) => {
         res.status(err.status || 500).json({

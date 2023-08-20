@@ -402,39 +402,26 @@ module.exports = {
 
             if (!openapi_object.components.schemas[table_name]) {
 
-                
                 // schema does not exist. add a stub for it
 
-                //add the object schema (used for doing POST/PUTs)
+                // add the object schema (used for doing POST/PUTs)
                 openapi_object.components.schemas[table_name] = {
                     type: "object",
                     properties: {
                     }
                 };
 
-
-                // adding a type=array of this entity to the schema where we use $ref
-                // does not appear to work. instead, we add a type=array and 
-                // specify the properties explicitly.
-
-                //add the array schema (used for returning responses)
-                // openapi_object.components.schemas[`${table_name}_array`] = {
-                //     type: "array",
-                //     items: {
-                //         $ref: `#/components/schemas/${table_name}`
-                //     }
-                // };
-
+                // add an array schema that points to the object schema
+                // used for returning responses when doing GETs
                 openapi_object.components.schemas[`${table_name}_array`] = {
                     type: "array",
-                    properties: {
+                    items: {
+                        $ref: `#/components/schemas/${table_name}`
                     }
                 };
 
-
-                //properties points to the entity schema properties node so we can populate it
+                // properties points to the entity schema properties node so we can populate it
                 let properties = openapi_object.components.schemas[table_name].properties;
-                let properties_array = openapi_object.components.schemas[`${table_name}_array`].properties;
 
                 let data_type_convert_postgres_to_openapi = {
                     'text': 'string',
@@ -455,29 +442,20 @@ module.exports = {
                             type: data_type_convert_postgres_to_openapi[column.data_type] || column.data_type
                         }
 
-                        properties_array[column.column_name] = {
-                            description: column.column_name,
-                            type: data_type_convert_postgres_to_openapi[column.data_type] || column.data_type
-                        }
-
                         // add example
 
                         switch (column.data_type) {
                             case 'text':
                                 properties[column.column_name].example = column.column_name;
-                                properties_array[column.column_name].example = column.column_name;
                                 break;
                             case 'bigint':
                                 properties[column.column_name].example = 0;
-                                properties_array[column.column_name].example = 0;
                                 break;
                             case 'uuid':
                                 properties[column.column_name].example = `00000000-0000-0000-0000-000000000000`;
-                                properties_array[column.column_name].example = `00000000-0000-0000-0000-000000000000`;
                                 break;
                             default:
                                 properties[column.column_name].example = ``;
-                                properties_array[column.column_name].example = ``;
                                 break;
                         }
 
@@ -485,7 +463,6 @@ module.exports = {
 
                         if (column.data_type == 'uuid') {
                             properties[column.column_name]['format'] = 'uuid';
-                            properties_array[column.column_name]['format'] = 'uuid';
                         }
 
                     }

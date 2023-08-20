@@ -19,6 +19,12 @@ if (db_use_ssl) {
     dbConfig.ssl = { rejectUnauthorized: false };
 }
 
+//by default, postgres returns bigserial and bigint as string.
+//make postgres convert bigserial and bigint (both with typeId = 20) to integer,
+//so that returned objects do not break openAPI type validation.
+
+pg.types.setTypeParser(20, parseInt);
+
 const pool = new pg.Pool(dbConfig);
 
 pool.on('error', function (err) {
