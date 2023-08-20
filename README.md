@@ -91,7 +91,7 @@ Foreign keys are used to create API paths in the form `/parent/{parent_uuid}/chi
 
 `PUT` (update) endpoints are available for tables with a `uuid` field.
 
-Enums are created for all `_status` tables in `api/enums/`.
+Enums are created in `api/enums/` for all tables with names ending in `_status`.
 
 Re-running `/api/generator/build` will overwrite the files created in `/api` and the `openapi.3.0.0.json` file.
 
