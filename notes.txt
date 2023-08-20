@@ -25,11 +25,12 @@ is enforced on UUID columns.
 opinions:
 
 - tables are assumed to have an 'id' field of type serial (primary key), 
-and optionally a uuid field.
+and optionally a uuid field, which should be NOT NULL.
 
 - table names ending in '_status' are assumed to have an id and description column
 which are iterated in api/enums/index.js so they can be used in code to refer to status values.
 
+- PUT (update) API calls are not available for tables without a uuid field (eg. status tables).
 
 
 

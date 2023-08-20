@@ -265,6 +265,13 @@ module.exports = {
             script_metadata = module.exports.generate_script_get_by_uuid(table_name, columns, column_names_csv, wrapped_table_name);
             module.exports.attach_path_to_openapi_object(openapi_object, table_name, columns, script_metadata);
             scripts.push(script_metadata.script);
+
+            // create update (PUT) script
+            script_metadata = module.exports.generate_script_update_by_uuid(table_name, columns, column_names_csv, wrapped_table_name);
+            module.exports.attach_path_to_openapi_object(openapi_object, table_name, columns, script_metadata);
+            scripts.push(script_metadata.script);
+
+
         }
         else if (has_id_field) {
 
@@ -283,33 +290,14 @@ module.exports = {
         module.exports.attach_path_to_openapi_object(openapi_object, table_name, columns, script_metadata);
         scripts.push(script_metadata.script);
 
-        // create update (PUT) script
-        script_metadata = module.exports.generate_script_update_by_uuid(table_name, columns, column_names_csv, wrapped_table_name);
-        module.exports.attach_path_to_openapi_object(openapi_object, table_name, columns, script_metadata);
-        scripts.push(script_metadata.script);
-
-        // get by other columns eg. get_by_email
-        // xz to do
-
-        // get all children by uuid
-        // xz to do 
-
-        // get all by status 
-        // xz to do 
 
         //create a module_end script (a 'footer')
-
         let module_end = `\n}`;
         scripts.push(module_end);
 
-        //write the code file to the api entity sub-folder 
-
+        //write the scripts to a code file in the api entity sub-folder 
         let api_entity_codefile_path = `${api_entity_path}/index.js`;
-
-        fs.writeFileSync(
-            api_entity_codefile_path,
-            scripts.join('')
-        );
+        fs.writeFileSync( api_entity_codefile_path, scripts.join('') );
 
     },
 
