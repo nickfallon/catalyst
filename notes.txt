@@ -18,7 +18,12 @@ you must provide an Authorization Bearer header (any value) to perform calls.
 
 opinions:
 
-- tables are assumed to have an 'id' field of type serial (primary key), and optionally a uuid field.
+- tables are assumed to have an 'id' field of type serial (primary key), 
+and optionally a uuid field.
+
+- table names ending in '_status' are assumed to have an id and description column
+which are iterated in api/enums/index.js so they can be used in code to refer to status values.
+
 
 
 

@@ -757,7 +757,8 @@ module.exports = {
         wrapped_child_table_name
     ) => {
 
-        //get all children of parent
+        //get all children of parent where the parent is table_name
+        //and the child table is child_table_name.
 
         let description = `Get all ${child_table_name}`;
         description += description.endsWith('s') ? 'es' : 's';
