@@ -1,6 +1,6 @@
 # Catalyst
 
-A rest API generator for node/postgres
+A REST OpenAPI generator for node/postgres
 
 ## What it does
 
