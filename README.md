@@ -85,4 +85,14 @@ Enums are created for all `_status` tables in `api/enums/`.
 
 Re-running `/api/generator/build` will overwrite the files created in `/api` and the `openapi.3.0.0.json` file.
 
+### Paging and filtering
+
+GET endpoints which take no parameters (so-called 'get all' endpoints) provide optional paging and filtering querystring parameters, as follows:
+
+- pagesize (integer, optional) : The number of rows to be returned. Default is 10. Maximum is 100.
+
+- page (integer, optional) : The page to be returned. Default is 0. If a non-zero page is specified, (pagesize * page) rows are skipped when performing the query.
+
+- filter (string, optional) : Used for searching for specific data. If specified, only rows which contain the filter string in any of the `text` columns are returned. If no data can be found, an empty array is returned.
+
 
