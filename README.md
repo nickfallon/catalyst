@@ -6,7 +6,7 @@ A REST OpenAPI generator for node/postgres
 
 When provided with a Postgres database, Catalyst does the following:
 
-- Read all tables and foreign keys in the database.
+- Reads all tables and foreign keys in the database.
 
 - Creates an OpenAPI specification from the tables and keys and saves the result to `openapi.3.0.0.json` in the root folder.
 
