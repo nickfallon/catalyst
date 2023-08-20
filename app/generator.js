@@ -41,23 +41,10 @@ module.exports = {
 
             await module.exports.create_entity(table, openapi_object);
 
-            //if table_name is '_status' or '_type', create enums
-            if ((table.endsWith('_status')) || (table.endsWith('_type'))) {
-                enums_object[table] = {};
-                let status_records = await module.exports.get_all_in_table(table);
-                for (var status_record of status_records) {
-                    let this_enum = {};
-                    for (var status_record_column in status_record) {
-                        if (status_record_column == 'id') {
-                            this_enum.value = parseInt(status_record[status_record_column]);
-                        }
-                        else {
-                            this_enum.key = status_record[status_record_column];
-                        }
-                    }
-                    enums_object[table][this_enum.key] = this_enum.value;
-                }
-            }
+            //create enums
+
+            await module.exports.create_enums(table, enums_object);
+
         }
 
         //write the enums api file
@@ -297,8 +284,31 @@ module.exports = {
 
         //write the scripts to a code file in the api entity sub-folder 
         let api_entity_codefile_path = `${api_entity_path}/index.js`;
-        fs.writeFileSync( api_entity_codefile_path, scripts.join('') );
+        fs.writeFileSync(api_entity_codefile_path, scripts.join(''));
 
+    },
+
+    create_enums: async (table_name, enums_object) => {
+
+        //if table_name is '_status' or '_type', create enums
+
+        if ((table_name.endsWith('_status')) || (table_name.endsWith('_type'))) {
+            enums_object[table_name] = {};
+            let status_records = await module.exports.get_all_in_table(table_name);
+            for (var status_record of status_records) {
+                let this_enum = {};
+                for (var status_record_column in status_record) {
+                    if (status_record_column == 'id') {
+                        this_enum.value = parseInt(status_record[status_record_column]);
+                    }
+                    else {
+                        this_enum.key = status_record[status_record_column];
+                    }
+                }
+                enums_object[table_name][this_enum.key] = this_enum.value;
+            }
+        }
+        
     },
 
     attach_path_to_openapi_object: (
