@@ -34,6 +34,8 @@ Generate the key files:
 
 `$ mkcert localhost`
 
+Rename `.env.example` to `.env` and set the postgres connection info.
+
 ## How to run
 
 Use: 
