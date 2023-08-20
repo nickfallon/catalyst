@@ -40,6 +40,9 @@ module.exports = {
 
     query_response: (sql, params, res) => {
 
+        // call postgres using sql and params
+        // and return the result as a json express response
+
         if (dbConfig.debug_sql) {
             console.log(sql, params);
         }
@@ -59,6 +62,8 @@ module.exports = {
     },
 
     query_promise: (sql, params) => {
+
+        // call postgres using sql and params returning a promise
 
         return new Promise((resolve, reject) => {
 
