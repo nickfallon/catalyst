@@ -41,8 +41,8 @@ module.exports = {
 
             await module.exports.create_entity(table, openapi_object);
 
-            //if table_name is '_status', create enums
-            if (table.endsWith('_status')) {
+            //if table_name is '_status' or '_type', create enums
+            if ((table.endsWith('_status')) || (table.endsWith('_type'))) {
                 enums_object[table] = {};
                 let status_records = await module.exports.get_all_in_table(table);
                 for (var status_record of status_records) {
