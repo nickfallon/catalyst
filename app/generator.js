@@ -583,8 +583,7 @@ module.exports = {
 
     get_fks_for_table: (table_name) => {
 
-        // if the table name is a reserved word 'eg. user) we 
-        // we can only find its foreign keys by wrapping the name in double quotes
+        // get foreign keys of this table
 
         let sql = `				
 			select
@@ -616,8 +615,7 @@ module.exports = {
 
     get_children_of_table: (table_name) => {
 
-        //get children of this table
-        //by checking foreign keys in other tables which match our table name
+        //get children of this table (that is, tables with foreign keys pointing here)
 
         let sql = `				
 			select
