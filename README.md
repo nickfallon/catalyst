@@ -4,7 +4,7 @@ A REST OpenAPI generator for node/postgres
 
 ## What it does
 
-When provided with a Postgres database (via connection details in `.env`), Catalyst does the following:
+When provided with a Postgres database, Catalyst does the following:
 
 - Creates an OpenAPI specification and saves it to `openapi.3.0.0.json` in the root folder.
 
