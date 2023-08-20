@@ -308,7 +308,7 @@ module.exports = {
                 enums_object[table_name][this_enum.key] = this_enum.value;
             }
         }
-        
+
     },
 
     attach_path_to_openapi_object: (
@@ -863,6 +863,10 @@ module.exports = {
             }
         }
 
+        //dummy where if no text fields to filter
+        if (!text_fields_exist) {
+            where_clause += `and $4 = $4`;
+        }
 
         let api_method = `get_all_${child_table_name}_of_${table_name}`;
 
@@ -916,17 +920,8 @@ module.exports = {
                 let parameters = [
                     id,
                     limit, 
-                    offset
-        `;
-
-        //xz - is there a better way? also this may be needed in get_all..
-        if (text_fields_exist) {
-            script +=
-                `           ,filter`;
-        }
-
-        script +=
-            `
+                    offset,
+                    filter
                 ];
                 return db.query_promise(sql, parameters);
 
