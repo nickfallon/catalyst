@@ -61,7 +61,7 @@ You must provide an Authorization Bearer header (any value) to perform calls.
 
 
 
-## Opinions
+## Assumptions/opinions
 
 - tables are assumed to have an `id` field of type serial (primary key), 
 and optionally a `uuid` field, which should be `NOT NULL`.
