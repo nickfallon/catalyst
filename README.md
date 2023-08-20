@@ -1,4 +1,4 @@
-# Catalyst
+# ![Catalyst](logo.svg) Catalyst
 
 A REST OpenAPI generator for node/postgres
 
