@@ -7,6 +7,8 @@ module.exports = {
 
     build: async (req, res) => {
 
+        console.log(`running app/generator/build()..`);
+
         // generates a REST API based on the database specified in the .env file. 
         // - the generated code is written to /api, one folder per table.
         // - a json file called openapi.3.0.0.json is written to the app root.
@@ -276,8 +278,13 @@ module.exports = {
         }
 
 
-        // create insert
+        // create insert (POST) script
         script_metadata = module.exports.generate_script_insert(table_name, columns, column_names_csv, wrapped_table_name);
+        module.exports.attach_path_to_openapi_object(openapi_object, table_name, columns, script_metadata);
+        scripts.push(script_metadata.script);
+
+        // create update (PUT) script
+        script_metadata = module.exports.generate_script_update_by_uuid(table_name, columns, column_names_csv, wrapped_table_name);
         module.exports.attach_path_to_openapi_object(openapi_object, table_name, columns, script_metadata);
         scripts.push(script_metadata.script);
 
@@ -346,7 +353,7 @@ module.exports = {
                     content: {
                         "application/json": {
                             schema: {
-                                $ref: `#/components/schemas/${table_name}`
+                                $ref: `#/components/schemas/${table_name}_array`
                             }
                         }
                     }
@@ -366,9 +373,9 @@ module.exports = {
         };
 
 
-        // for POSTs, attach a requestBody stub
+        // for POSTs and PUTs, attach a requestBody stub
 
-        if (rest_method == 'post') {
+        if ((rest_method == 'post') || (rest_method == 'put')) {
 
             openapi_object.paths[api_method_path][rest_method]['requestBody'] = {
                 content: {
@@ -382,69 +389,116 @@ module.exports = {
                         }
                     }
                 },
-                description: `Create ${table_name}`
+                description: `${rest_method} ${table_name}`
             }
 
-            //set the POST requestBody to a new schema
+            //set the POST/PUT requestBody to a new schema
 
             openapi_object.paths[api_method_path][rest_method]['requestBody']['content']['application/json']['schema']['$ref'] =
                 `#/components/schemas/${table_name}`;
 
 
-            // add the schema for this entity to the components
+            // does this entity schema already exist? (POST and PUT both use it)
 
-            openapi_object.components.schemas[table_name] = {
-                type: "object",
-                properties: {
+            if (!openapi_object.components.schemas[table_name]) {
+
+                
+                // schema does not exist. add a stub for it
+
+                //add the object schema (used for doing POST/PUTs)
+                openapi_object.components.schemas[table_name] = {
+                    type: "object",
+                    properties: {
+                    }
+                };
+
+
+                // adding a type=array of this entity to the schema where we use $ref
+                // does not appear to work. instead, we add a type=array and 
+                // specify the properties explicitly.
+
+                //add the array schema (used for returning responses)
+                // openapi_object.components.schemas[`${table_name}_array`] = {
+                //     type: "array",
+                //     items: {
+                //         $ref: `#/components/schemas/${table_name}`
+                //     }
+                // };
+
+                openapi_object.components.schemas[`${table_name}_array`] = {
+                    type: "array",
+                    properties: {
+                    }
+                };
+
+
+                //properties points to the entity schema properties node so we can populate it
+                let properties = openapi_object.components.schemas[table_name].properties;
+                let properties_array = openapi_object.components.schemas[`${table_name}_array`].properties;
+
+                let data_type_convert_postgres_to_openapi = {
+                    'text': 'string',
+                    'bigint': 'integer',
+                    'uuid': 'string'
                 }
-            };
 
-            //properties points to the entity schema properties node so we can populate it
-            let properties = openapi_object.components.schemas[table_name].properties;
+                //create the schema
 
-            let required = openapi_object.paths[api_method_path][rest_method]['requestBody']['content']['application/json']['schema']['required'];
+                for (column of columns) {
 
-            let data_type_convert_postgres_to_openapi = {
-                'text': 'string',
-                'bigint': 'integer',
-                'uuid': 'string'
+                    if (column.column_name != 'id') {
+
+                        // populate properties list of requestBody
+
+                        properties[column.column_name] = {
+                            description: column.column_name,
+                            type: data_type_convert_postgres_to_openapi[column.data_type] || column.data_type
+                        }
+
+                        properties_array[column.column_name] = {
+                            description: column.column_name,
+                            type: data_type_convert_postgres_to_openapi[column.data_type] || column.data_type
+                        }
+
+                        // add example
+
+                        switch (column.data_type) {
+                            case 'text':
+                                properties[column.column_name].example = column.column_name;
+                                properties_array[column.column_name].example = column.column_name;
+                                break;
+                            case 'bigint':
+                                properties[column.column_name].example = 0;
+                                properties_array[column.column_name].example = 0;
+                                break;
+                            case 'uuid':
+                                properties[column.column_name].example = `00000000-0000-0000-0000-000000000000`;
+                                properties_array[column.column_name].example = `00000000-0000-0000-0000-000000000000`;
+                                break;
+                            default:
+                                properties[column.column_name].example = ``;
+                                properties_array[column.column_name].example = ``;
+                                break;
+                        }
+
+                        // add format, if required
+
+                        if (column.data_type == 'uuid') {
+                            properties[column.column_name]['format'] = 'uuid';
+                            properties_array[column.column_name]['format'] = 'uuid';
+                        }
+
+                    }
+                }
+
             }
 
-            //create the schema
+            //create required array of requestBody in path
 
+            let required = openapi_object.paths[api_method_path][rest_method]['requestBody']['content']['application/json']['schema']['required'];
             for (column of columns) {
 
                 if (column.column_name != 'id') {
-
-                    // populate properties list of requestBody
-
-                    properties[column.column_name] = {
-                        description: column.column_name,
-                        type: data_type_convert_postgres_to_openapi[column.data_type] || column.data_type
-                    }
-
-                    // add example
-
-                    switch (column.data_type) {
-                        case 'text':
-                            properties[column.column_name].example = column.column_name;
-                            break;
-                        case 'bigint':
-                            properties[column.column_name].example = 0;
-                            break;
-                        case 'uuid':
-                            properties[column.column_name].example = `00000000-0000-0000-0000-000000000000`;
-                            break;
-                        default:
-                            properties[column.column_name].example = ``;
-                            break;
-                    }
-
-                    // add format, if required
-
-                    if (column.data_type == 'uuid') {
-                        properties[column.column_name]['format'] = 'uuid';
-                    }
 
                     // populate required array of requestBody
 
@@ -452,7 +506,6 @@ module.exports = {
 
                 }
             }
-
 
         }
 
@@ -669,16 +722,23 @@ module.exports = {
 
         let where_clause = ``;
         let first_where = true;
+        let text_field_exists = false;
         //for all columns
         for (column of columns) {
             //which are text or uuid
             if (column.data_type == 'text') {
+                text_field_exists = true;
                 //make a where clause
                 where_clause += first_where ? 'where\n\t\t\t\t\t\t' : '\n\t\t\t\t\tor  ';
-                where_clause += `${column.column_name} ilike $1`;
+                where_clause += `${column.column_name} ilike $3`;
                 first_where = false;
             }
         }
+        //dummy where if no text fields to filter
+        if (!text_field_exists) {
+            where_clause = `where $3 = $3`;
+        }
+
 
         let api_method = `get_all`;
 
@@ -721,15 +781,16 @@ module.exports = {
                     from 
                         ${wrapped_table_name}
                     ${where_clause}
-                    limit $2
-                    offset $3;
+                    limit $1
+                    offset $2;
                 \`;
 
                 let parameters = [
-                    filter,
                     limit, 
-                    offset
+                    offset,
+                    filter
                 ];
+                
                 return db.query_promise(sql, parameters);
 
             },
@@ -1059,7 +1120,7 @@ module.exports = {
         wrapped_table_name
     ) => {
 
-        let description = `Insert ${table_name}`;
+        let description = `Create ${table_name}`;
 
         let api_method_path = `/${table_name}/`;
         let rest_method = 'post';
@@ -1117,6 +1178,105 @@ module.exports = {
 
                 let parameters = [
                     ${column_names_without_id} 
+                ];
+                return db.query_promise(sql, parameters);
+
+            },
+
+        `;
+
+        return {
+            description,
+            api_method_path,
+            rest_method,
+            api_method,
+            parameters,
+            script
+        }
+
+    },
+
+    generate_script_update_by_uuid: (
+        table_name,
+        columns,
+        column_names_csv,
+        wrapped_table_name
+    ) => {
+
+        let description = `Update ${table_name}`;
+
+        let api_method_path = `/${table_name}/{uuid}`;
+        let rest_method = 'put';
+        let parameters = [
+            {
+                "description": `${table_name} uuid`,
+                "in": "path",
+                "name": "uuid",
+                "required": true,
+                "schema": {
+                    "type": "string",
+                    "format": "uuid"
+                }
+            }
+        ];
+
+        let column_names_array = columns
+            // do not include the 'id' or 'uuid' field
+            .filter((column) => {
+                return ((column.column_name != 'id') && (column.column_name != 'uuid'))
+            })
+            .map((column) => {
+                return column.column_name
+            });
+
+        let column_names_without_id_and_uuid = column_names_array.join(', ');
+
+        //create string of col=$1, col=$2...
+        //skip the uuid (it will be passed as a path param)
+        let column_names_with_dollar_indexes = ``;
+        let ix = 2;
+        for (var column_name of column_names_array) {
+            column_names_with_dollar_indexes += `${column_name}=$${ix}, `;
+            ix++;
+        }
+        //strip last comma and space
+        if (column_names_array.length) {
+            column_names_with_dollar_indexes = column_names_with_dollar_indexes.slice(0, -2);
+        }
+
+        let api_method = `update_by_id`;
+
+        let script = `
+            ${api_method}: async (req, res) => {
+
+                let uuid = parseInt(req.params.uuid);
+
+                let { ${column_names_without_id_and_uuid} } = req.body;
+
+                try {
+                    let result = await module.exports.${api_method}_p(uuid, ${column_names_without_id_and_uuid});
+                    res.json(result);
+                }
+                catch (e){
+                    console.log(\`error in ${api_method_path}\`);
+                    console.log(e);
+                    res.json(e);
+                }
+
+            },
+
+            ${api_method}_p: (uuid, ${column_names_without_id_and_uuid} ) => {
+
+                let sql = \`
+                    update ${wrapped_table_name} 
+                    set ${column_names_with_dollar_indexes}
+                    where uuid = $1;
+            
+                \`;
+
+                let parameters = [
+                    uuid,
+                    ${column_names_without_id_and_uuid}
                 ];
                 return db.query_promise(sql, parameters);
 
