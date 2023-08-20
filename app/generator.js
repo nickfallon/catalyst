@@ -848,7 +848,7 @@ module.exports = {
 
         //xz to fix  - hardcoded id..
 
-        where_clause += `(${wrapped_table_name}.id = $1)`;
+        where_clause += ` (${wrapped_table_name}.id = $1) `;
 
 
         let text_fields_exist = false;
