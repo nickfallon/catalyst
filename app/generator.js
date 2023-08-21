@@ -782,7 +782,7 @@ module.exports = {
                 }
             },
             {
-                "description": `filter (searches all string fields)`,
+                "description": `filter (optional.searches all string fields)`,
                 "in": "query",
                 "name": "filter",
                 "required": false,
@@ -931,7 +931,7 @@ module.exports = {
                 }
             },
             {
-                "description": `filter (searches all string fields)`,
+                "description": `filter (optional. searches all string fields)`,
                 "in": "query",
                 "name": "filter",
                 "required": false,
