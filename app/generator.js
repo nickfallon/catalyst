@@ -7,12 +7,12 @@ module.exports = {
 
     join: async (req, res) => {
 
-
-        let source_table = 'invoice';
+        let origin_table = 'invoice';
+        let current_table = origin_table;
         let dest_table = 'user';
         let table_chain = [];
 
-        let data = await module.exports.recurse_join_chain(source_table, dest_table, table_chain);
+        let data = await module.exports.recurse_join_chain(origin_table, current_table, dest_table, table_chain, ``);
         res.json(data);
 
     },
@@ -76,6 +76,8 @@ module.exports = {
         let api_json_path = path.join(__dirname, '../');
         let api_json_file = `${api_json_path}/openapi.3.0.0.json`;
         fs.writeFileSync(api_json_file, JSON.stringify(openapi_object));
+
+        console.log(`app/generator/build() complete.`);
 
         res.json({ msg: 'build complete' });
 
@@ -219,7 +221,7 @@ module.exports = {
 
         // create get_all
 
-        script_metadata = module.exports.generate_script_get_all(table_name, columns, column_names_csv, wrapped_table_name);
+        script_metadata = await module.exports.generate_script_get_all(table_name, columns, column_names_csv, wrapped_table_name);
         module.exports.attach_path_to_openapi_object(openapi_object, table_name, columns, script_metadata);
         scripts.push(script_metadata.script);
 
@@ -233,7 +235,7 @@ module.exports = {
             let child_column_names_csv = child_column_info.column_names_csv;
             let wrapped_child_table_name = module.exports.wrap_reserved_table_names(child.table_name);
 
-            script_metadata = module.exports.generate_script_get_all_children(
+            script_metadata = await module.exports.generate_script_get_all_children(
                 table_name,
                 child,
                 child.table_name,
@@ -262,12 +264,12 @@ module.exports = {
 
             // create get_by_uuid
 
-            script_metadata = module.exports.generate_script_get_by_uuid(table_name, columns, column_names_csv, wrapped_table_name);
+            script_metadata = await module.exports.generate_script_get_by_uuid(table_name, columns, column_names_csv, wrapped_table_name);
             module.exports.attach_path_to_openapi_object(openapi_object, table_name, columns, script_metadata);
             scripts.push(script_metadata.script);
 
             // create update (PUT) script
-            script_metadata = module.exports.generate_script_update_by_uuid(table_name, columns, column_names_csv, wrapped_table_name);
+            script_metadata = await module.exports.generate_script_update_by_uuid(table_name, columns, column_names_csv, wrapped_table_name);
             module.exports.attach_path_to_openapi_object(openapi_object, table_name, columns, script_metadata);
             scripts.push(script_metadata.script);
 
@@ -279,14 +281,14 @@ module.exports = {
 
             // create get_by_id
 
-            script_metadata = module.exports.generate_script_get_by_id(table_name, columns, column_names_csv, wrapped_table_name);
+            script_metadata = await module.exports.generate_script_get_by_id(table_name, columns, column_names_csv, wrapped_table_name);
             module.exports.attach_path_to_openapi_object(openapi_object, table_name, columns, script_metadata);
             scripts.push(script_metadata.script);
         }
 
 
         // create insert (POST) script
-        script_metadata = module.exports.generate_script_insert(table_name, columns, column_names_csv, wrapped_table_name);
+        script_metadata = await module.exports.generate_script_insert(table_name, columns, column_names_csv, wrapped_table_name);
         module.exports.attach_path_to_openapi_object(openapi_object, table_name, columns, script_metadata);
         scripts.push(script_metadata.script);
 
@@ -661,13 +663,17 @@ module.exports = {
 
     },
 
-    recurse_join_chain: async (source_table, dest_table, table_chain) => {
+    recurse_join_chain: async (origin_table, current_table, dest_table, table_chain, sql) => {
 
         // in order to restrict data to only those rows that a user is entitled to see,
-        // we assume that the 'source_table' (the table that we want to retrieve from)
+        // we assume that the 'origin_table' (the table that we want to retrieve from)
         // and the 'dest_table' (typically a table that describes a user)
         // can be joined either directly or indirectly to ensure that only data that 
         // the user controls is returned.
+
+        // the current_table is initially set to the same value as origin_table and is used
+        // to recurse tables. the origin_table is only required to prevent accidentally 
+        // joining the origin to itself.
 
         // if the join chain is not direct (ie. there are other tables in between), this 
         // function discovers and constructs the necessary joins.
@@ -677,41 +683,52 @@ module.exports = {
         // circular endless recursion is prevented by passing and checking the contents of
         // the 'table_chain' parameter, which is an array of all tables in the recursion stack.
 
-
-        // if recursion has found the destination table, return the chain and exit
+        // if recursion has found the destination table, 
+        // return the chain and the sql JOIN clauses, and exit
 
         if (table_chain.includes(dest_table)) {
 
-            return table_chain;
+            return { table_chain, sql };
 
         }
 
         // get children (tables with foreign keys pointing to this source table)
-        let children = await module.exports.get_children_of_table(`${source_table}`);
+        let children = await module.exports.get_children_of_table(`${current_table}`);
 
         // get parents (tables to which this source table's foreign keys point)
-        let parents = await module.exports.get_fks_for_table(`${source_table}`);
+        let parents = await module.exports.get_fks_for_table(`${current_table}`);
 
         // for each child table 
-        // (tables with a foreign key pointing to the current table aka source_table)
+        // (tables with a foreign key pointing to the current table aka current_table)
 
         for (var child of children) {
 
-            // ensure the child is not in the table_chain 
-            // to prevent endless recursion
+            //ensure the child isn't the origin table (prevent self-joins)
+            if (child.table_name != origin_table) {
 
-            if (!table_chain.includes(child.table_name)) {
+                // ensure the child is not in the table_chain 
+                // to prevent endless recursion
 
-                // clone the table chain and add the child
+                if (!table_chain.includes(child.table_name)) {
 
-                let table_chain_copy = [...table_chain];
-                table_chain_copy.push(child.table_name);
+                    // clone the table chain and add the child
 
-                //recurse child tables. if recursion returns non-null value, we found a complete join chain
+                    let table_chain_copy = [...table_chain];
+                    table_chain_copy.push(child.table_name);
 
-                let result = await module.exports.recurse_join_chain(child.table_name, dest_table, table_chain_copy);
-                if (result) {
-                    return result;
+                    // recurse child table
+
+                    let result = await module.exports.recurse_join_chain(
+                        origin_table,
+                        child.table_name,
+                        dest_table,
+                        table_chain_copy,
+                        sql + `join ${child.table_name} on ${child.table_name}.${child.column_name} = ${child.foreign_table_name}.${child.foreign_column_name} \n\t\t\t\t\t`
+                    );
+                    if (result) {
+                        return result;
+                    }
+
                 }
 
             }
@@ -719,25 +736,36 @@ module.exports = {
         }
 
         // for each parent table 
-        // (tables pointed to by a foreign key in the current table aka source_table)
+        // (tables pointed to by a foreign key in the current table aka current_table)
 
         for (var parent of parents) {
 
-            // ensure the parent is not in the table_chain 
-            // to prevent endless recursion
+            //ensure the parent isn't the origin table (prevent self-joins)
+            if (parent.foreign_table_name != origin_table) {
 
-            if (!table_chain.includes(parent.foreign_table_name)) {
+                // ensure the parent is not in the table_chain 
+                // to prevent endless recursion
 
-                //clone the table chain and add the parent
+                if (!table_chain.includes(parent.foreign_table_name)) {
 
-                let table_chain_copy = [...table_chain];
-                table_chain_copy.push(parent.foreign_table_name);
+                    //clone the table chain and add the parent
 
-                //recurse parent tables. if recursion returns non-null value, we found a complete join chain
+                    let table_chain_copy = [...table_chain];
+                    table_chain_copy.push(parent.foreign_table_name);
 
-                let result = await module.exports.recurse_join_chain(parent.foreign_table_name, dest_table, table_chain_copy);
-                if (result) {
-                    return result;
+                    // recurse parent table
+
+                    let result = await module.exports.recurse_join_chain(
+                        origin_table,
+                        parent.foreign_table_name,
+                        dest_table,
+                        table_chain_copy,
+                        sql + `join ${parent.foreign_table_name} on ${parent.foreign_table_name}.${parent.foreign_column_name} = ${parent.table_name}.${parent.column_name} \n\t\t\t\t\t`
+                    );
+                    if (result) {
+                        return result;
+                    }
+
                 }
 
             }
@@ -750,7 +778,7 @@ module.exports = {
 
     },
 
-    generate_script_get_all: (
+    generate_script_get_all: async (
         table_name,
         columns,
         column_names_csv,
@@ -814,6 +842,33 @@ module.exports = {
             where_clause = `where $3 = $3`;
         }
 
+        let join_clauses = ``;
+
+        // ==================================================================
+        // create a chain of JOIN clauses to enforce selection of only those
+        // records which can be joined to some specific 'restriction' table.
+        // ==================================================================
+        // we assume that the 'restriction' table is user.
+        // this code restricts all data returned to that which can be 
+        // joined, directly or indirectly, to a specific user.
+
+        // xz to do - if this code is active, the generated sql
+        // xz to do - should include a WHERE user.bearer_token = {token}
+        // xz to do - or similar, to enforce authentication of this user
+        // xz to do - and properly restrict data access.
+
+        // xz to do - this code should not be used for 'super-admin' users,
+        // xz to do - eg. those users who are entitled to access all data in the db.
+
+        let restriction_table = 'user';
+        let join_data;
+        if (table_name != restriction_table) {
+            join_data = await module.exports.recurse_join_chain(table_name, table_name, restriction_table, [], ``);
+            if (join_data?.sql) {
+                join_clauses = join_data.sql;
+            }
+        }
+        // ==================================================================
 
         let api_method = `get_all`;
 
@@ -855,6 +910,7 @@ module.exports = {
                         ${column_names_csv} 
                     from 
                         ${wrapped_table_name}
+                    ${join_clauses}
                     ${where_clause}
                     limit $1
                     offset $2;
@@ -883,7 +939,7 @@ module.exports = {
 
     },
 
-    generate_script_get_all_children: (
+    generate_script_get_all_children: async (
         table_name,
         child,
         child_table_name,
@@ -1042,7 +1098,7 @@ module.exports = {
 
     },
 
-    generate_script_get_by_id: (
+    generate_script_get_by_id: async (
         table_name,
         columns,
         column_names_csv,
@@ -1113,7 +1169,7 @@ module.exports = {
 
     },
 
-    generate_script_get_by_uuid: (
+    generate_script_get_by_uuid: async (
         table_name,
         columns,
         column_names_csv,
@@ -1183,7 +1239,7 @@ module.exports = {
 
     },
 
-    generate_script_insert: (
+    generate_script_insert: async (
         table_name,
         columns,
         column_names_csv,
@@ -1266,7 +1322,7 @@ module.exports = {
 
     },
 
-    generate_script_update_by_uuid: (
+    generate_script_update_by_uuid: async (
         table_name,
         columns,
         column_names_csv,
