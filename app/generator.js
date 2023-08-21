@@ -728,7 +728,7 @@ module.exports = {
 
             if (!table_chain.includes(parent.foreign_table_name)) {
 
-                //clone the table chain and add the child
+                //clone the table chain and add the parent
 
                 let table_chain_copy = [...table_chain];
                 table_chain_copy.push(parent.foreign_table_name);
