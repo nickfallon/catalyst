@@ -5,6 +5,19 @@ const fs = require('fs');
 
 module.exports = {
 
+    join: async (req, res) => {
+
+
+        let source_table = 'invoice';
+        let dest_table = 'user';
+        let table_chain = [];
+
+        let data = await module.exports.recurse_join_chain(source_table, dest_table, table_chain);
+        res.json(data);
+
+    },
+
+
     build: async (req, res) => {
 
         console.log(`running app/generator/build()..`);
@@ -605,7 +618,8 @@ module.exports = {
                 ccu.constraint_name = tc.constraint_name
             and ccu.table_schema = tc.table_schema
             where 
-                tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = $1;
+                tc.constraint_type = 'FOREIGN KEY' 
+            and tc.table_name = $1;
             `;
 
         let parameters = [table_name];
@@ -647,6 +661,94 @@ module.exports = {
 
     },
 
+    recurse_join_chain: async (source_table, dest_table, table_chain) => {
+
+        // in order to restrict data to only those rows that a user is entitled to see,
+        // we assume that the 'source_table' (the table that we want to retrieve from)
+        // and the 'dest_table' (typically a table that describes a user)
+        // can be joined either directly or indirectly to ensure that only data that 
+        // the user controls is returned.
+
+        // if the join chain is not direct (ie. there are other tables in between), this 
+        // function discovers and constructs the necessary joins.
+        // it does this by recursing tables using foreign keys until a route is 
+        // discovered between the source and destination tables. 
+
+        // circular endless recursion is prevented by passing and checking the contents of
+        // the 'table_chain' parameter, which is an array of all tables in the recursion stack.
+
+
+        // if recursion has found the destination table, return the chain and exit
+
+        if (table_chain.includes(dest_table)) {
+
+            return table_chain;
+
+        }
+
+        // get children (tables with foreign keys pointing to this source table)
+        let children = await module.exports.get_children_of_table(`${source_table}`);
+
+        // get parents (tables to which this source table's foreign keys point)
+        let parents = await module.exports.get_fks_for_table(`${source_table}`);
+
+        // for each child table 
+        // (tables with a foreign key pointing to the current table aka source_table)
+
+        for (var child of children) {
+
+            // ensure the child is not in the table_chain 
+            // to prevent endless recursion
+
+            if (!table_chain.includes(child.table_name)) {
+
+                // clone the table chain and add the child
+
+                let table_chain_copy = [...table_chain];
+                table_chain_copy.push(child.table_name);
+
+                //recurse child tables. if recursion returns non-null value, we found a complete join chain
+
+                let result = await module.exports.recurse_join_chain(child.table_name, dest_table, table_chain_copy);
+                if (result) {
+                    return result;
+                }
+
+            }
+
+        }
+
+        // for each parent table 
+        // (tables pointed to by a foreign key in the current table aka source_table)
+
+        for (var parent of parents) {
+
+            // ensure the parent is not in the table_chain 
+            // to prevent endless recursion
+
+            if (!table_chain.includes(parent.foreign_table_name)) {
+
+                //clone the table chain and add the child
+
+                let table_chain_copy = [...table_chain];
+                table_chain_copy.push(parent.foreign_table_name);
+
+                //recurse parent tables. if recursion returns non-null value, we found a complete join chain
+
+                let result = await module.exports.recurse_join_chain(parent.foreign_table_name, dest_table, table_chain_copy);
+                if (result) {
+                    return result;
+                }
+
+            }
+
+        }
+
+        //nothing found at this leaf - return null
+
+        return null;
+
+    },
 
     generate_script_get_all: (
         table_name,

@@ -44,6 +44,9 @@ else {
 let generator = require('./app/generator');
 app.get('/api/generator/build', generator.build);
 
+app.get('/api/generator/join', generator.join);
+
+
 // try to consume the openapi specification, 
 // if it exists (on second run)
 
