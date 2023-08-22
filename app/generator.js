@@ -718,12 +718,15 @@ module.exports = {
 
                     // recurse child table
 
+                    let wrapped_child_table_name = module.exports.wrap_reserved_table_names(child.table_name);
+                    let wrapped_child_foreign_table_name = module.exports.wrap_reserved_table_names(child.foreign_table_name);
+
                     let result = await module.exports.recurse_join_chain(
                         origin_table,
                         child.table_name,
                         dest_table,
                         table_chain_copy,
-                        sql + `join ${child.table_name} on ${child.table_name}.${child.column_name} = ${child.foreign_table_name}.${child.foreign_column_name} \n\t\t\t\t\t`
+                        sql + `join ${wrapped_child_table_name} on ${wrapped_child_table_name}.${child.column_name} = ${wrapped_child_foreign_table_name}.${child.foreign_column_name} \n\t\t\t\t\t`
                     );
                     if (result) {
                         return result;
@@ -755,12 +758,15 @@ module.exports = {
 
                     // recurse parent table
 
+                    let wrapped_parent_foreign_table_name = module.exports.wrap_reserved_table_names(parent.foreign_table_name);
+                    let wrapped_parent_table_name = module.exports.wrap_reserved_table_names(parent.table_name);
+
                     let result = await module.exports.recurse_join_chain(
                         origin_table,
                         parent.foreign_table_name,
                         dest_table,
                         table_chain_copy,
-                        sql + `join ${parent.foreign_table_name} on ${parent.foreign_table_name}.${parent.foreign_column_name} = ${parent.table_name}.${parent.column_name} \n\t\t\t\t\t`
+                        sql + `join ${wrapped_parent_foreign_table_name} on ${wrapped_parent_foreign_table_name}.${parent.foreign_column_name} = ${wrapped_parent_table_name}.${parent.column_name} \n\t\t\t\t\t`
                     );
                     if (result) {
                         return result;
@@ -823,7 +829,7 @@ module.exports = {
         // the filter querystring paramter constructs a where clause 
         // to search all text fields with case-insensitve search
 
-        let where_clause = ``;
+        let where_clause = `where `;
         let first_where = true;
         let text_field_exists = false;
         //for all columns
@@ -832,14 +838,18 @@ module.exports = {
             if (column.data_type == 'text') {
                 text_field_exists = true;
                 //make a where clause
-                where_clause += first_where ? 'where\n\t\t\t\t\t\t' : '\n\t\t\t\t\tor  ';
+                where_clause += first_where ? '\n\t\t\t\t\t\t(\n\t\t\t\t\t\t' : '\n\t\t\t\t\tor  ';
                 where_clause += `${column.column_name} ilike $3`;
                 first_where = false;
             }
         }
+        if (text_field_exists) {
+            where_clause += '\n\t\t\t\t\t\t)\n\t\t\t\t\t';
+        }
+
         //dummy where if no text fields to filter
         if (!text_field_exists) {
-            where_clause = `where $3 = $3`;
+            where_clause = `where $3 = $3 `;
         }
 
         let join_clauses = ``;
@@ -852,10 +862,10 @@ module.exports = {
         // this code restricts all data returned to that which can be 
         // joined, directly or indirectly, to a specific user.
 
-        // xz to do - if this code is active, the generated sql
-        // xz to do - should include a WHERE user.bearer_token = {token}
-        // xz to do - or similar, to enforce authentication of this user
-        // xz to do - and properly restrict data access.
+        // if this code is active, the generated sql
+        // includes a WHERE user.bearer_token = {token}
+        // to enforce authentication of this user
+        // and properly restrict data access.
 
         // xz to do - this code should not be used for 'super-admin' users,
         // xz to do - eg. those users who are entitled to access all data in the db.
@@ -866,14 +876,21 @@ module.exports = {
             join_data = await module.exports.recurse_join_chain(table_name, table_name, restriction_table, [], ``);
             if (join_data?.sql) {
                 join_clauses = join_data.sql;
+                //adust WHERE clause to ensure the joined user owns the bearer token
+                where_clause += `and "user".bearer_token = $4`;
             }
         }
+
+
+
         // ==================================================================
 
         let api_method = `get_all`;
 
         let script = `
             ${api_method}: async (req, res) => {
+
+                const bearer_token = ((req.headers.authorization || '')).split('Bearer ').join('');
 
                 try {
 
@@ -891,7 +908,8 @@ module.exports = {
                     let result = await module.exports.${api_method}_p(
                         limit, 
                         offset,
-                        filter
+                        filter,
+                        bearer_token
                     );
                     res.json(result);
                 }
@@ -903,7 +921,7 @@ module.exports = {
 
             },
 
-            ${api_method}_p: (limit, offset, filter) => {
+            ${api_method}_p: (limit, offset, filter, bearer_token) => {
 
                 let sql = \`
                     select 
@@ -919,7 +937,8 @@ module.exports = {
                 let parameters = [
                     limit, 
                     offset,
-                    filter
+                    filter,
+                    bearer_token
                 ];
                 
                 return db.query_promise(sql, parameters);
