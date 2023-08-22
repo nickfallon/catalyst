@@ -80,10 +80,11 @@ module.exports = {
             pool.query(sql, params, (err, result) => {
 
                 if (err) {
-                    console.log(err);
-                    console.trace();
+                    console.log('========================================================================================');
+                    console.log(`ERROR in query_promise: ${err.message}`);
+                    console.log(sql);
+                    console.log('========================================================================================');
                     reject(err);
-
                 }
                 else {
                     resolve(result.rows);
