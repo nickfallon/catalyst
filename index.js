@@ -70,10 +70,10 @@ try {
         }),
     );
 
-    // bounce openapi validation errors with a HTTP 500 error
+    // bounce openapi validation errors with a HTTP 400 error
 
     app.use((err, req, res, next) => {
-        res.status(err.status || 500).json({
+        res.status(err.status || 400).json({
             message: `openapi-validator: ${err.message}`,
             errors: err.errors,
         });
