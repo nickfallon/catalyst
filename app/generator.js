@@ -829,27 +829,33 @@ module.exports = {
         // the filter querystring paramter constructs a where clause 
         // to search all text fields with case-insensitve search
 
-        let where_clause = `where `;
+        let where_clause = ``;
+        let where_clauses = ``;
+        let where_clause_array = [];
+
+        let parameter_names = [`limit`, `offset`];
+
         let first_where = true;
         let text_field_exists = false;
+
         //for all columns
+        where_clause = ``;
         for (column of columns) {
             //which are text or uuid
             if (column.data_type == 'text') {
                 text_field_exists = true;
                 //make a where clause
                 where_clause += first_where ? '\n\t\t\t\t\t\t(\n\t\t\t\t\t\t' : '\n\t\t\t\t\tor  ';
-                where_clause += `${column.column_name} ilike $3`;
+                where_clause += `${column.column_name} ilike $${parameter_names.length + 1}`;
                 first_where = false;
             }
         }
         if (text_field_exists) {
             where_clause += '\n\t\t\t\t\t\t)\n\t\t\t\t\t';
+            parameter_names.push(`filter`);
         }
-
-        //dummy where if no text fields to filter
-        if (!text_field_exists) {
-            where_clause = `where $3 = $3 `;
+        if (where_clause != '') {
+            where_clause_array.push(where_clause);
         }
 
         let join_clauses = ``;
@@ -876,12 +882,17 @@ module.exports = {
             join_data = await module.exports.recurse_join_chain(table_name, table_name, restriction_table, [], ``);
             if (join_data?.sql) {
                 join_clauses = join_data.sql;
+
                 //adust WHERE clause to ensure the joined user owns the bearer token
-                where_clause += `and "user".bearer_token = $4`;
+                where_clause = `"user".bearer_token = $${parameter_names.length + 1}`;
+                where_clause_array.push(where_clause);
+                parameter_names.push(`bearer_token`);
             }
         }
 
-
+        if (where_clause_array.length) {
+            where_clauses = `where ` + where_clause_array.join(` and `);
+        }
 
         // ==================================================================
 
@@ -906,10 +917,7 @@ module.exports = {
                     let filter = '%' + (req.query.filter || '') + '%';
 
                     let result = await module.exports.${api_method}_p(
-                        limit, 
-                        offset,
-                        filter,
-                        bearer_token
+                        ${parameter_names.join(',')}
                     );
                     res.json(result);
                 }
@@ -921,7 +929,7 @@ module.exports = {
 
             },
 
-            ${api_method}_p: (limit, offset, filter, bearer_token) => {
+            ${api_method}_p: (${parameter_names.join(',')}) => {
 
                 let sql = \`
                     select 
@@ -929,16 +937,13 @@ module.exports = {
                     from 
                         ${wrapped_table_name}
                     ${join_clauses}
-                    ${where_clause}
+                    ${where_clauses}
                     limit $1
                     offset $2;
                 \`;
 
                 let parameters = [
-                    limit, 
-                    offset,
-                    filter,
-                    bearer_token
+                    ${parameter_names.join(',')}
                 ];
                 
                 return db.query_promise(sql, parameters);
