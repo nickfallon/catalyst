@@ -64,7 +64,7 @@ Re-start the app.
 
 In a browser, go to  [https://localhost:9000/api/v1/api-docs](https://localhost:9000/api/v1/api-docs) to see interactive API docs.
 
-You must provide an Authorization Bearer header (any value) to perform calls.
+*Note:* You must provide an Authorization Bearer header to perform calls. (see [Security and restriction of data access](### Security and restriction of data access) for details).
 
 
 ## Features
