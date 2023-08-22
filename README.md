@@ -122,6 +122,6 @@ There are two kinds of API users:
 - 'External' users, who have restricted access
 
 In the case of external users, *restricted* access means that when querying any entity, the SQL
-query will always join to the `user` table, either directly or indirectly. The API code generator discovers which tables are needed to join in order to reach the `user` table. This means that for databases where multiple domains, organisations, companies, accounts or other kinds of silo exist, external users will only be able to retrieve the data in their own silo.
+query will always join to the `user` table, either directly or indirectly, if it's possible to do so. The API code generator discovers which tables are needed to join in order to reach the `user` table. This means that for databases where multiple domains, organisations, companies, accounts or other kinds of silo exist, external users will only be able to retrieve the data in their own silo.
 
 By default, all users are considered external. Users are only treated as 'Internal' if a boolean column `superadmin` exists in the `user` table and is set to `true`.
