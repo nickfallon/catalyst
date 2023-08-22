@@ -77,7 +77,24 @@ and optionally a `uuid` field, which should be `NOT NULL`.
 
 - `PUT` (update) API calls are not available for tables without a `uuid` field (eg. status tables).
 
+### Security and restriction of data access
 
+An assumption is made that a `user` table exists containing a row for each user, and that a `bearer_token` column is present on that table which is used to identify the API caller by
+matching it with the provided authorization header.
+
+There are two kinds of API users:
+
+- 'Internal' users, who have access to everything
+
+- 'External' users, who have restricted access
+
+In the case of external users, *restricted* access means that when querying any entity, the SQL
+query will always join to the `user` table, directly or indirectly. The API code generator discovers
+which tables are needed to join in order to reach the `user` table. This means that for databases
+where multiple domains/organisations/companies/accounts or other kinds of silo exist, external 
+users will only be able to retrieve the data in their own silo.
+
+By default, all users are considered external. Users are only treated as 'Internal' if a boolean column `superadmin` exists in the `user` table and is set to `true` for that user.
 
 ## Features
 
