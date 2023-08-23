@@ -1,3 +1,10 @@
+console.log("              __        __           __ ");
+console.log("  _________ _/ /_____ _/ /_  _______/ /_");
+console.log(" / ___/ __ `/ __/ __ `/ / / / / ___/ __/");
+console.log("/ /__/ /_/ / /_/ /_/ / / /_/ (__  ) /_  ");
+console.log("\\___/\\__,_/\\__/\\__,_/_/\\__, /____/\\__/  ");
+console.log("                      /____/            ");
+console.log("");
 
 // catalyst - a code generator for Node/OpenAPI/Postgres
 
@@ -28,7 +35,6 @@ if (process.env.localhost == 'true') {
     const key = fs.readFileSync("certs/localhost-key.pem", "utf-8");
     const cert = fs.readFileSync("certs/localhost.pem", "utf-8");
     server = https.createServer({ key, cert }, app).listen(port);
-    console.log(`express running on: https://localhost:${port}`);
 }
 else {
 
@@ -56,56 +62,61 @@ try {
 
     const openapi_json_path = "./openapi.3.0.0.json"
     const openAPIDef = require(openapi_json_path);
-    const apiPath = openAPIDef.servers[0].url;
 
-    // enforce openapi validation
+    if (openAPIDef.servers) {
 
-    const OpenApiValidator = require('express-openapi-validator');
-    app.use(
-        OpenApiValidator.middleware({
-            apiSpec: openapi_json_path,
-            validateRequests: true,
-            validateResponses: true,
-            ignorePaths: (path) => path.includes('/api-docs/')
-        }),
-    );
+        const apiPath = openAPIDef.servers[0].url;
 
-    // bounce openapi validation errors with a HTTP 400 error
+        // enforce openapi validation
 
-    app.use((err, req, res, next) => {
-        res.status(err.status || 400).json({
-            message: `openapi-validator: ${err.message}`,
-            errors: err.errors,
+        const OpenApiValidator = require('express-openapi-validator');
+        app.use(
+            OpenApiValidator.middleware({
+                apiSpec: openapi_json_path,
+                validateRequests: true,
+                validateResponses: true,
+                ignorePaths: (path) => path.includes('/api-docs/')
+            }),
+        );
+
+        // bounce openapi validation errors with a HTTP 400 error
+
+        app.use((err, req, res, next) => {
+            res.status(err.status || 400).json({
+                message: `openapi-validator: ${err.message}`,
+                errors: err.errors,
+            });
         });
-    });
 
-    // serve openapi interactive swagger docs at /api/v1/api-docs
+        // serve openapi interactive swagger docs at /api/v1/api-docs
 
-    const swaggerUi = require("swagger-ui-express");
-    const swaggerConfig = require("./routes/swaggerUI/config");
-    app.use(
-        `${apiPath}/api-docs`,
-        swaggerUi.serve,
-        swaggerUi.setup(openAPIDef, swaggerConfig)
-    );
+        const swaggerUi = require("swagger-ui-express");
+        const swaggerConfig = require("./routes/swaggerUI/config");
+        app.use(
+            `${apiPath}/api-docs`,
+            swaggerUi.serve,
+            swaggerUi.setup(openAPIDef, swaggerConfig)
+        );
 
-    // create express routes for api based on the openapi doc
+        // create express routes for api based on the openapi doc
 
-    let routes = require("./routes");
-    routes.create_api_routes(app, openAPIDef, apiPath);
+        let routes = require("./routes");
+        routes.create_api_routes(app, openAPIDef, apiPath);
 
+        console.log(`API interactive docs: https://localhost:${port}/api/v1/api-docs/`);
+
+    }
+    else {
+
+        console.log(`To generate the API, go to https://localhost:${port}/api/generator/build then re-start the app.`);
+
+    }
 }
 catch (e) {
     console.log(e);
 }
 
-console.log(`generate API: https://localhost:${port}/api/generator/build`);
-console.log(`API interactive docs: https://localhost:${port}/api/v1/api-docs/`);
-
 module.exports = {
     server: server,
     app: app
 }
-
-
-
