@@ -1,6 +1,6 @@
 # ![Catalyst](logo.svg) Catalyst
 
-A REST OpenAPI generator for node/postgres
+An OpenAPI-compatible REST API generator for node/postgres
 
 ## What it does
 
