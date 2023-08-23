@@ -55,12 +55,11 @@ In a browser, go to [https://localhost:9000/api/generator/build](https://localho
 
 The generator connects to a postgres database using the credentials in `.env` file.
 It then creates a file `openapi.3.0.0.json` and writes code to the `/api` folder to perform SQL queries.
-Express routes are automatically mapped to the `/api` folder code in `index.js`.
 
 
 ### Using the API 
 
-Re-start the app.
+Re-start the app. Express routes are automatically mapped to the generated `/api` folder code.
 
 In a browser, go to  [https://localhost:9000/api/v1/api-docs](https://localhost:9000/api/v1/api-docs) to see interactive API docs.
 
