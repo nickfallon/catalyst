@@ -56,6 +56,8 @@ In a browser, go to [https://localhost:9000/api/generator/build](https://localho
 The generator connects to a postgres database using the credentials in `.env` file.
 It then creates a file `openapi.3.0.0.json` and writes code to the `/api` folder to perform SQL queries.
 
+Re-running `/api/generator/build` will overwrite the files created in `/api` and the `openapi.3.0.0.json` file.
+
 
 ### Using the API 
 
@@ -85,8 +87,6 @@ Bearer token authorization is enforced for all API calls.
 Foreign keys are used to create API paths in the form `/parent/{parent_uuid}/child`.
 
 Enums are created in `api/enums/` for all tables with names ending in `_status` or `_type`.
-
-Re-running `/api/generator/build` will overwrite the files created in `/api` and the `openapi.3.0.0.json` file.
 
 ### Paging and filtering
 
