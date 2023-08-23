@@ -72,8 +72,6 @@ Data types are validated and enforced by the API.
 
 Bearer token authorization is enforced for all API calls.
 
-Foreign keys are used to create API paths in the form `/parent/{parent_uuid}/child`.
-
 `GET` endpoints are available for all tables, eg. `/invoice`
 
 `GET by uuid` endpoints are generated for all tables which have a `uuid` column. 
@@ -83,6 +81,8 @@ Foreign keys are used to create API paths in the form `/parent/{parent_uuid}/chi
 `POST` (create) endpoints are available for all tables.
 
 `PUT` (update) endpoints are available for tables with a `uuid` field.
+
+Foreign keys are used to create API paths in the form `/parent/{parent_uuid}/child`.
 
 Enums are created in `api/enums/` for all tables with names ending in `_status` or `_type`.
 
