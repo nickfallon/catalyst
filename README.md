@@ -113,8 +113,9 @@ and optionally a `uuid` field, which should be `NOT NULL`.
 
 ### Security and restriction of data access
 
-An assumption is made that a `user` table exists containing a row for each user, and that a `bearer_token` column is present on that table which is used to identify the API caller by
-matching it with the provided authorization header. This means that the API can always identify the user performing the call.
+An assumption is made that a `user` table exists containing a row for each user, and that a `bearer_token` column is present on that table which is used to identify the API caller by matching it with the provided authorization header. This means that the API can always identify the user performing the call.
+
+The `user` table name can be changed in the `.env` variable `JOIN_USER_TABLE`.
 
 There are two kinds of API users:
 

@@ -9,7 +9,7 @@ module.exports = {
 
         let origin_table = 'invoice';
         let current_table = origin_table;
-        let dest_table = 'user';
+        let dest_table = process.env.JOIN_USER_TABLE;
         let table_chain = [];
 
         let data = await module.exports.recurse_join_chain(origin_table, current_table, dest_table, table_chain, ``);
