@@ -58,6 +58,8 @@ It then creates a file `openapi.3.0.0.json` and writes code to the `/api` folder
 
 Re-running `/api/generator/build` will overwrite the files created in `/api` and the `openapi.3.0.0.json` file.
 
+*Note:* Don't use nodemon when generating the API, since dynamic changes to the source trigger a restart which stops the generator.
+
 
 ### Using the API 
 
