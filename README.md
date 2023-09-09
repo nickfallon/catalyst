@@ -123,4 +123,8 @@ There are two kinds of API users:
 In the case of regular users, *restricted* access means that when querying any entity, the SQL
 query will always join to the `user` table, either directly or indirectly, if it's possible to do so. The API code generator discovers which tables are needed to join in order to reach the `user` table. This means that for databases where multiple domains, organisations, companies, accounts or other kinds of silo exist, regular users will only be able to retrieve the data in their own silo.
 
-By default, all users are considered to be regular users with restricted access. Users are only treated as 'superadmin' if a boolean column `superadmin` exists in the `user` table and is set to `true`.
+By default, all users are considered to be regular users with restricted access. 
+
+To do:
+
+Users are only treated as 'superadmin' if a boolean column `superadmin` exists in the `user` table and is set to `true`.
