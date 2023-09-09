@@ -86,9 +86,9 @@ Bearer token authorization is enforced for all API calls.
 
 `PUT` (update) endpoints are available for tables with a `uuid` field.
 
-Foreign keys are used to create API paths in the form `/parent/{parent_uuid}/child`.
+`Get child collections` Foreign keys are used to create API paths in the form `/parent/{parent_uuid}/child`.
 
-Enums are created in `api/enums/` for all tables with names ending in `_status` or `_type`.
+`Enums` are created in `api/enums/` for all tables with names ending in `_status` or `_type`.
 
 ### Paging and filtering
 
