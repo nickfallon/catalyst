@@ -113,21 +113,6 @@ and optionally a `uuid` field, which should be `NOT NULL`.
 
 ### Security and restriction of data access
 
-An assumption is made that a `user` table exists containing a row for each user, and that a `bearer_token` column is present on that table which is used to identify the API caller by matching it with the provided authorization header. This means that the API can always identify the user performing the call.
+An assumption is made that a `user` table exists containing a row for each user, and that a `bearer_token` column is present on that table which is used to identify the API caller by matching it with the provided authorization header. This means that the API can always identify the user performing the call. The `user` table name can be changed in the `.env` variable `JOIN_USER_TABLE`.
 
-The `user` table name can be changed in the `.env` variable `JOIN_USER_TABLE`.
-
-There are two kinds of API users:
-
-- 'superadmin' users, who have access to everything
-
-- regular users, who have restricted access
-
-In the case of regular users, *restricted* access means that when querying any entity, the SQL
-query will always join to the `user` table, either directly or indirectly, if it's possible to do so. The API code generator discovers which tables are needed to join in order to reach the `user` table. This means that for databases where multiple domains, organisations, companies, accounts or other kinds of silo exist, regular users will only be able to retrieve the data in their own silo.
-
-By default, all users are considered to be regular users with restricted access. 
-
-To do:
-
-Users are only treated as 'superadmin' if a boolean column `superadmin` exists in the `user` table and is set to `true`.
+When querying any entity, the SQL query will always join to the `user` table, either directly or indirectly, if it's possible to do so. The API code generator discovers which tables are needed to join in order to reach the `user` table using `recurse_join_chain()` in `generator.js`. This means that for databases where multiple domains, organisations, companies, accounts or other kinds of silo exist, regular users will only be able to retrieve the data in their own silo.
