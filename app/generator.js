@@ -860,11 +860,9 @@ module.exports = {
 
         let join_clauses = ``;
 
-        // ==================================================================
         // create a chain of JOIN clauses to enforce selection of only those
         // records which can be joined to some specific 'restriction' table.
-        // ==================================================================
-        // we assume that the 'restriction' table is user.
+
         // this code restricts all data returned to that which can be 
         // joined, directly or indirectly, to a specific user.
 
@@ -876,7 +874,9 @@ module.exports = {
         // xz to do - this code should not be used for 'super-admin' users,
         // xz to do - eg. those users who are entitled to access all data in the db.
 
-        let restriction_table = 'user';
+        let restriction_table = process.env.JOIN_USER_TABLE;
+        let wrapped_restriction_table = module.exports.wrap_reserved_table_names(restriction_table);
+
         let join_data;
         if (table_name != restriction_table) {
             join_data = await module.exports.recurse_join_chain(table_name, table_name, restriction_table, [], ``);
@@ -884,7 +884,7 @@ module.exports = {
                 join_clauses = join_data.sql;
 
                 //adust WHERE clause to ensure the joined user owns the bearer token
-                where_clause = `"user".bearer_token = $${parameter_names.length + 1}`;
+                where_clause = `${wrapped_restriction_table}.bearer_token = $${parameter_names.length + 1}`;
                 where_clause_array.push(where_clause);
                 parameter_names.push(`bearer_token`);
             }
