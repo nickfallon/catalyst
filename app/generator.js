@@ -22,6 +22,24 @@ module.exports = {
 
         console.log(`running app/generator/build()..`);
 
+        let api_path = path.join(__dirname, '../api');
+
+        //check if /api folder exists. if not, create it.
+
+        try {
+
+            if (!fs.existsSync(api_path)) {
+                fs.mkdirSync(api_path);
+            }
+
+        } catch (e) {
+
+            console.error(e);
+            res.json({ error: 'failed to create api folder' });
+            return;
+
+        }
+
         // generates a REST API based on the database specified in the .env file. 
         // - the generated code is written to /api, one folder per table.
         // - a json file called openapi.3.0.0.json is written to the app root.
@@ -61,7 +79,7 @@ module.exports = {
         }
 
         //write the enums api file
-        let api_path = path.join(__dirname, '../api');
+
         let enum_path = `${api_path}/enums`;
         let enum_file_path = `${enum_path}/index.js`;
         if (!fs.existsSync(enum_path)) {
@@ -513,34 +531,6 @@ module.exports = {
                 version: `${package.version}`
             },
             paths: {
-                "/": {
-                    get: {
-                        responses: {
-                            200: {
-                                "description": "successful operation",
-                                "content": {
-                                    "application/json": {
-                                        "schema": {}
-                                    }
-                                }
-                            },
-                            400: {
-                                "description": "Bad Request"
-                            }
-                        },
-                        security: [
-                            {
-                                "bearerAuth": []
-                            }
-                        ],
-                        tags: [
-                            "Test"
-                        ],
-                        description: "Ping test, returns 200 OK",
-                        operationId: "test/ping",
-                        summary: "Ping test, returns 200 OK."
-                    }
-                }
             },
             tags: [
                 {
@@ -924,7 +914,7 @@ module.exports = {
                 catch (e){
                     console.log(\`error in ${api_method_path}\`);
                     console.log(e);
-                    res.json(e);
+                    res.json([{error: e.message}]);
                 }
 
             },
@@ -1081,7 +1071,7 @@ module.exports = {
                 catch (e){
                     console.log(\`error in ${api_method_path}\`);
                     console.log(e);
-                    res.json(e);
+                    res.json([{error: e.message}]);
                 }
 
             },
@@ -1159,7 +1149,7 @@ module.exports = {
                 catch (e){
                     console.log(\`error in ${api_method_path}\`);
                     console.log(e);
-                    res.json(e);
+                    res.json([{error: e.message}]);
                 }
 
             },
@@ -1229,7 +1219,7 @@ module.exports = {
                 catch (e){
                     console.log(\`error in ${api_method_path}\`);
                     console.log(e);
-                    res.json(e);
+                    res.json([{error: e.message}]);
                 }
 
             },
@@ -1310,7 +1300,7 @@ module.exports = {
                 catch (e){
                     console.log(\`error in ${api_method_path}\`);
                     console.log(e);
-                    res.json(e);
+                    res.json([{error: e.message}]);
                 }
 
             },
@@ -1410,7 +1400,7 @@ module.exports = {
                 catch (e){
                     console.log(\`error in ${api_method_path}\`);
                     console.log(e);
-                    res.json(e);
+                    res.json([{error: e.message}]);
                 }
 
             },
