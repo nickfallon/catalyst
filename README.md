@@ -120,4 +120,4 @@ When querying any entity, the SQL query will always join to the `user` table, ei
 
 ### Bugs/to-do
 
-- `user` table (or `.env.JOIN_USER_TABLE` equivalent) can be openly queried. restrict to admin only
+- `user` table (or `.env.JOIN_USER_TABLE` equivalent) can be openly queried. restrict to admin only or add environment variable/list of restricted tables.
