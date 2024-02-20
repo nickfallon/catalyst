@@ -120,5 +120,4 @@ When querying any entity, the SQL query will always join to the `user` table, ei
 
 ### Bugs/to-do
 
-- Invalid bearer tokens fail input verification - catch and sanitise these errors.
 - `user` table (or `.env.JOIN_USER_TABLE` equivalent) can be openly queried. restrict to admin only
