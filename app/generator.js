@@ -391,6 +391,16 @@ module.exports = {
                 },
                 400: {
                     description: "Bad Request"
+                },
+                401: {
+                    description: "Unauthorized",
+                    content: {
+                        "application/json": {
+                            schema: {
+                                $ref: `#/components/responses/UnauthorizedError`
+                            }
+                        }
+                    }
                 }
             },
             security: [
@@ -545,7 +555,28 @@ module.exports = {
             ],
             components: {
                 schemas: {
-
+                },
+                responses: {
+                    UnauthorizedError: {
+                        description: "Unauthorized error. The request lacks valid authentication credentials.",
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    type: "object",
+                                    properties: {
+                                        error: {
+                                            type: "string",
+                                            example: "Unauthorized"
+                                        },
+                                        message: {
+                                            type: "string",
+                                            example: "The request lacks valid authentication credentials."
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
                 },
                 securitySchemes: {
                     bearerAuth: {

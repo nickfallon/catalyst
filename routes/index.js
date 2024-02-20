@@ -1,4 +1,6 @@
 
+const authentication = require('../authentication');
+
 module.exports = {
 
     create_api_routes: (app, openAPIDef, apiPath) => {
@@ -53,11 +55,7 @@ module.exports = {
 
                 app[restMethod](
                     expressPath,
-                    // validator.validate(restMethod, path),
-                    // ip_monitor.capture(db, auth_type, routerController, routerMethod),
-                    // authentication.authenticate_user(db, auth_type),
-                    // authentication.authenticate_admin(db, auth_type),
-                    // authentication.authenticate_bearer(db, auth_type),
+                    authentication.authenticate_bearer_token,
                     controllers[routerController][routerMethod]
                 );
 
