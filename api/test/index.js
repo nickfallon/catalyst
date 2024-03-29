@@ -1,5 +1,5 @@
 
-const db = require('../../db');
+const pool = require('../../db/pool.js');
 
 module.exports = {
 

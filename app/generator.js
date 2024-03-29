@@ -1,5 +1,5 @@
 
-const db = require('../db');
+const pool = require('../db/pool.js');
 const path = require('path');
 const fs = require('fs');
 
@@ -16,7 +16,6 @@ module.exports = {
         res.json(data);
 
     },
-
 
     build: async (req, res) => {
 
@@ -120,7 +119,7 @@ module.exports = {
             where schemaname = 'public';
         `;
         let parameters = [];
-        return db.query_promise(sql, parameters);
+        return pool.query(sql, parameters);
 
     },
 
@@ -132,7 +131,7 @@ module.exports = {
             select * from ${table_name};
         `;
         let parameters = [];
-        return db.query_promise(sql, parameters);
+        return pool.query(sql, parameters);
 
     },
 
@@ -217,7 +216,7 @@ module.exports = {
         // create a module_start script (a 'header')
 
         let module_start = ``;
-        module_start += `const db = require('../../db'); \n`;
+        module_start += `const pool = require('../../db/pool.js'); \n`;
         module_start += `\n`;
         module_start += `module.exports = { \n`;
         scripts.push(module_start);
@@ -613,7 +612,7 @@ module.exports = {
         `;
 
         let parameters = [table_name];
-        return db.query_promise(sql, parameters);
+        return pool.query(sql, parameters);
 
     },
 
@@ -646,7 +645,7 @@ module.exports = {
             `;
 
         let parameters = [table_name];
-        return db.query_promise(sql, parameters);
+        return pool.query(sql, parameters);
 
     },
 
@@ -680,7 +679,7 @@ module.exports = {
             `;
 
         let parameters = [table_name];
-        return db.query_promise(sql, parameters);
+        return pool.query(sql, parameters);
 
     },
 
@@ -967,7 +966,7 @@ module.exports = {
                     ${parameter_names.join(',')}
                 ];
                 
-                return db.query_promise(sql, parameters);
+                return pool.query(sql, parameters);
 
             },
 
@@ -1126,7 +1125,7 @@ module.exports = {
                     offset,
                     filter
                 ];
-                return db.query_promise(sql, parameters);
+                return pool.query(sql, parameters);
 
             },
 
@@ -1197,7 +1196,7 @@ module.exports = {
                 \`;
 
                 let parameters = [id];
-                return db.query_promise(sql, parameters);
+                return pool.query(sql, parameters);
 
             },
 
@@ -1267,7 +1266,7 @@ module.exports = {
                 \`;
 
                 let parameters = [uuid];
-                return db.query_promise(sql, parameters);
+                return pool.query(sql, parameters);
 
             },
 
@@ -1350,7 +1349,7 @@ module.exports = {
                 let parameters = [
                     ${column_names_without_id} 
                 ];
-                return db.query_promise(sql, parameters);
+                return pool.query(sql, parameters);
 
             },
 
@@ -1449,7 +1448,7 @@ module.exports = {
                     uuid,
                     ${column_names_without_id_and_uuid}
                 ];
-                return db.query_promise(sql, parameters);
+                return pool.query(sql, parameters);
 
             },
 
