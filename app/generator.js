@@ -1,5 +1,5 @@
 
-const pool = require('../db/pool.js');
+const { execute_sql } = require('../db');
 const path = require('path');
 const fs = require('fs');
 
@@ -119,7 +119,7 @@ module.exports = {
             where schemaname = 'public';
         `;
         let parameters = [];
-        return pool.query(sql, parameters);
+        return execute_sql(sql, parameters);
 
     },
 
@@ -131,7 +131,7 @@ module.exports = {
             select * from ${table_name};
         `;
         let parameters = [];
-        return pool.query(sql, parameters);
+        return execute_sql(sql, parameters);
 
     },
 
@@ -216,7 +216,7 @@ module.exports = {
         // create a module_start script (a 'header')
 
         let module_start = ``;
-        module_start += `const pool = require('../../db/pool.js'); \n`;
+        module_start += `const { execute_sql } = require('../../db'); \n`;
         module_start += `\n`;
         module_start += `module.exports = { \n`;
         scripts.push(module_start);
@@ -612,7 +612,7 @@ module.exports = {
         `;
 
         let parameters = [table_name];
-        return pool.query(sql, parameters);
+        return execute_sql(sql, parameters);
 
     },
 
@@ -645,7 +645,7 @@ module.exports = {
             `;
 
         let parameters = [table_name];
-        return pool.query(sql, parameters);
+        return execute_sql(sql, parameters);
 
     },
 
@@ -679,7 +679,7 @@ module.exports = {
             `;
 
         let parameters = [table_name];
-        return pool.query(sql, parameters);
+        return execute_sql(sql, parameters);
 
     },
 
@@ -966,7 +966,7 @@ module.exports = {
                     ${parameter_names.join(',')}
                 ];
                 
-                return pool.query(sql, parameters);
+                return execute_sql(sql, parameters);
 
             },
 
@@ -1125,7 +1125,7 @@ module.exports = {
                     offset,
                     filter
                 ];
-                return pool.query(sql, parameters);
+                return execute_sql(sql, parameters);
 
             },
 
@@ -1196,7 +1196,7 @@ module.exports = {
                 \`;
 
                 let parameters = [id];
-                return pool.query(sql, parameters);
+                return execute_sql(sql, parameters);
 
             },
 
@@ -1266,7 +1266,7 @@ module.exports = {
                 \`;
 
                 let parameters = [uuid];
-                return pool.query(sql, parameters);
+                return execute_sql(sql, parameters);
 
             },
 
@@ -1349,7 +1349,7 @@ module.exports = {
                 let parameters = [
                     ${column_names_without_id} 
                 ];
-                return pool.query(sql, parameters);
+                return execute_sql(sql, parameters);
 
             },
 
@@ -1448,7 +1448,7 @@ module.exports = {
                     uuid,
                     ${column_names_without_id_and_uuid}
                 ];
-                return pool.query(sql, parameters);
+                return execute_sql(sql, parameters);
 
             },
 

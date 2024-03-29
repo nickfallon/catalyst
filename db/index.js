@@ -1,5 +1,4 @@
 
-
 const pg = require('pg');
 
 let ssl = (process.env.DB_SSL != 'local');
@@ -25,8 +24,26 @@ if (db_use_ssl) {
     dbConfig.ssl = { rejectUnauthorized: false };
 }
 
+//by default, postgres returns bigserial and bigint as string.
+//make postgres convert bigserial and bigint (both with typeId = 20) to integer,
+//so that returned objects do not break openAPI type validation.
+
+pg.types.setTypeParser(20, parseInt);
+
+
+//create a db pool object
 const pool = new pg.Pool(dbConfig);
 
-module.exports = pool;
+async function execute_sql(sql, parameters) {
+
+    //calling pool.query() is a convenience method to run a query 
+    //on the first available idle client and return its result
+
+    let res = await pool.query(sql, parameters);
+    return res.rows;
+
+}
+
+module.exports = { execute_sql };
 
 

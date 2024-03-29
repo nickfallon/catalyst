@@ -1,5 +1,5 @@
 
-const pool = require('../db/pool.js');
+const { execute_sql } = require('../db');
 
 module.exports = {
 
@@ -20,7 +20,7 @@ module.exports = {
         let rows = [];
 
         try {
-            rows = await pool.query(sql, parameters);
+            rows = await execute_sql(sql, parameters);
         }
         catch (e) {
             console.log(`error in authentication.authenticate_bearer_token: `);
