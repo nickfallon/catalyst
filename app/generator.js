@@ -21,6 +21,16 @@ module.exports = {
 
         console.log(`running app/generator/build()..`);
 
+        // read whitelist array of tables to include (if it exists)
+
+        let whitelist_path = path.join(__dirname, 'whitelist.json');
+        let whitelist_data = [];
+        try {
+            whitelist_data = JSON.parse(fs.readFileSync(whitelist_path, 'utf-8'));
+        } catch (error) {
+            //no whitelist
+        }
+
         let api_path = path.join(__dirname, '../api');
 
         //check if /api folder exists. if not, create it.
@@ -67,13 +77,22 @@ module.exports = {
 
         for (table of table_names) {
 
-            //create the entity 
+            // if a whitelist exists, only generate those tables
+            
+            if (
+                (whitelist_data.length == 0) ||
+                (whitelist_data.some(item => item.table === table))
+            ) {
 
-            await module.exports.create_entity(table, openapi_object);
+                //create the entity 
 
-            //create enums
+                await module.exports.create_entity(table, openapi_object);
 
-            await module.exports.create_enums(table, enums_object);
+                //create enums
+
+                await module.exports.create_enums(table, enums_object);
+
+            }
 
         }
 
@@ -150,7 +169,7 @@ module.exports = {
                 }
             });
 
-        let has_uuid_field = columns.some(column => column.column_name == 'uuid');
+        let has_uuid_field = columns.some(column => column.column_name.includes('uuid'));
 
         // join column names with commas for SQL building.
 
@@ -198,7 +217,7 @@ module.exports = {
         //check if this table has an 'id' or 'uuid' or both
 
         let has_id_field = columns.some(column => column.column_name == 'id');
-        let has_uuid_field = columns.some(column => column.column_name == 'uuid');
+        let has_uuid_field = columns.some(column => column.column_name.includes('uuid'));
 
         //create an entity sub-folder in the API folder to hold our api code for this entity
 
@@ -238,7 +257,7 @@ module.exports = {
 
         // create get_all
 
-        script_metadata = await module.exports.generate_script_get_all(table_name, columns, column_names_csv, wrapped_table_name);
+        script_metadata = await module.exports.generate_script_get_all(table_name, columns, column_names_csv, wrapped_table_name, has_id_field, has_uuid_field);
         module.exports.attach_path_to_openapi_object(openapi_object, table_name, columns, script_metadata);
         scripts.push(script_metadata.script);
 
@@ -273,8 +292,7 @@ module.exports = {
 
         // create get_by_uuid or get_by_id
 
-        // if this entity has a 'uuid' column, then REST access is by uuid eg. /users/{uuid}
-        // otherwise, it's assumed to be 'id'.
+        // if this entity has a 'uuid' column, then REST access is allowed by uuid eg. /users/{uuid}
         if (has_uuid_field) {
 
             // has a uuid column
@@ -479,7 +497,8 @@ module.exports = {
 
                         properties[column.column_name] = {
                             description: column.column_name,
-                            type: data_type_convert_postgres_to_openapi[column.data_type] || column.data_type
+                            type: data_type_convert_postgres_to_openapi[column.data_type] || column.data_type,
+                            nullable: true,
                         }
 
                         // add example
@@ -808,7 +827,9 @@ module.exports = {
         table_name,
         columns,
         column_names_csv,
-        wrapped_table_name
+        wrapped_table_name,
+        has_id_field,
+        has_uuid_field
     ) => {
 
         let description = `Get all ${table_name}`;
@@ -853,6 +874,11 @@ module.exports = {
         let where_clauses = ``;
         let where_clause_array = [];
 
+        let order_by = ``;
+        if (has_id_field) {
+            order_by = `order by ${wrapped_table_name}.id`;
+        }
+
         let parameter_names = [`limit`, `offset`];
 
         let first_where = true;
@@ -866,7 +892,7 @@ module.exports = {
                 text_field_exists = true;
                 //make a where clause
                 where_clause += first_where ? '\n\t\t\t\t\t\t(\n\t\t\t\t\t\t' : '\n\t\t\t\t\tor  ';
-                where_clause += `${column.column_name} ilike $${parameter_names.length + 1}`;
+                where_clause += `${table_name}.${column.column_name} ilike $${parameter_names.length + 1}`;
                 first_where = false;
             }
         }
@@ -958,6 +984,7 @@ module.exports = {
                         ${wrapped_table_name}
                     ${join_clauses}
                     ${where_clauses}
+                    ${order_by}
                     limit $1
                     offset $2;
                 \`;
@@ -1270,6 +1297,21 @@ module.exports = {
 
             },
 
+            ${api_method}_admin: (uuid) => {
+
+                let sql = \`
+                    select *
+                    from 
+                        ${wrapped_table_name}
+                    where 
+                        uuid = $1;
+                \`;
+
+                let parameters = [uuid];
+                return execute_sql(sql, parameters);
+
+            },
+
         `;
 
         return {
@@ -1343,7 +1385,8 @@ module.exports = {
                     )
                     values ( 
                         ${dollar_index_parameter_list} 
-                    );
+                    )
+                    returning id;
                 \`;
 
                 let parameters = [
@@ -1393,7 +1436,7 @@ module.exports = {
         let column_names_array = columns
             // do not include the 'id' or 'uuid' field
             .filter((column) => {
-                return ((column.column_name != 'id') && (column.column_name != 'uuid'))
+                return ((column.column_name != 'id') && (!column.column_name.includes('uuid')))
             })
             .map((column) => {
                 return column.column_name
