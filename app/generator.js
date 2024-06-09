@@ -835,7 +835,7 @@ module.exports = {
         let description = `Get all ${table_name}`;
         description += description.endsWith('s') ? 'es' : 's';
 
-        let api_method_path = `/${table_name}/`;
+        let api_method_path = `/${table_name}`;
         let rest_method = 'get';
         let parameters = [
             {
@@ -1334,7 +1334,7 @@ module.exports = {
 
         let description = `Create ${table_name}`;
 
-        let api_method_path = `/${table_name}/`;
+        let api_method_path = `/${table_name}`;
         let rest_method = 'post';
         let parameters = [];
 
